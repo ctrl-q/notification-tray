@@ -96,8 +96,7 @@ class SystemTrayFileBrowser:
 
     def open_file(self, path: str):
         try:
-            with open(path) as f:
-                content = json.load(f)["body"]
+            content = "\n---\n".join(map(lambda d: d["body"], map(json.loads, Path(path).read_text().splitlines())))
             # Truncate content if it's too long
             if len(content) == 1000:
                 content = content[:997] + "..."
