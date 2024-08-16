@@ -66,13 +66,6 @@ class SystemTrayFileBrowser:
                                 sub, p
                             )
                         )
-
-                        # Add "Move to Trash" action for the folder
-                        trash_action = QAction("Move to Trash", submenu)
-                        trash_action.triggered.connect(
-                            lambda checked, p=item_path: self.move_to_trash(p)
-                        )
-                        submenu.addAction(trash_action)
                     else:
                         file_action = QAction(item, menu)
                         file_action.triggered.connect(
@@ -96,7 +89,12 @@ class SystemTrayFileBrowser:
 
     def open_file(self, path: str):
         try:
-            content = "\n---\n".join(map(lambda d: d["body"], map(json.loads, Path(path).read_text().splitlines())))
+            content = "\n---\n".join(
+                map(
+                    lambda d: d["body"],
+                    map(json.loads, Path(path).read_text().splitlines()),
+                )
+            )
             # Truncate content if it's too long
             if len(content) == 1000:
                 content = content[:997] + "..."
