@@ -6,7 +6,6 @@
 # ]
 # ///
 import json
-import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -18,7 +17,7 @@ from send2trash import send2trash
 
 
 class SystemTrayFileBrowser:
-    def __init__(self, root_path: str):
+    def __init__(self, root_path: Path):
         self.app = QApplication([])
         self.root_path = root_path
         self.tray_icon = None
@@ -31,7 +30,7 @@ class SystemTrayFileBrowser:
 
     def setup_file_watcher(self):
         self.watcher = QFileSystemWatcher(
-            [self.root_path, *map(str, Path(self.root_path).rglob("*"))]
+            [str(self.root_path), *map(str, self.root_path.rglob("*"))]
         )
         self.watcher.directoryChanged.connect(self.on_directory_changed)
 
@@ -48,7 +47,7 @@ class SystemTrayFileBrowser:
     def on_directory_changed(self, path: str):
         self.update_icon()
         self.setup_tray_menu()
-        sub_paths = list(map(str, Path(path).rglob("*")))
+        sub_paths = list(Path(path).rglob("*"))
         if sub_paths:
             self.watcher.addPaths(map(str, sub_paths))
 
@@ -69,27 +68,26 @@ class SystemTrayFileBrowser:
         exit_action.triggered.connect(self.app.quit)
         self.tray_menu.addAction(exit_action)
 
-    def add_directory_contents(self, path, menu):
+    def add_directory_contents(self, path: Path, menu: QMenu):
         try:
-            if os.path.exists(path):
-                items = sorted(os.listdir(path))
+            if path.exists():
+                items = sorted(path.iterdir())
                 for item in items:
-                    item_path = os.path.join(path, item)
-                    if os.path.isdir(item_path):
-                        if not self.is_do_not_disturb_active(item_path):
-                            submenu = QMenu(item, menu)
+                    if item.is_dir():
+                        if not self.is_do_not_disturb_active(item):
+                            submenu = QMenu(item.name, menu)
                             menu.addMenu(submenu)
                             placeholder = QAction("Loading...", submenu)
                             submenu.addAction(placeholder)
                             submenu.aboutToShow.connect(
-                                lambda sub=submenu, p=item_path: self.populate_submenu(
+                                lambda sub=submenu, p=item: self.populate_submenu(
                                     sub, p
                                 )
                             )
                     else:
-                        file_action = QAction(item, menu)
+                        file_action = QAction(item.name, menu)
                         file_action.triggered.connect(
-                            lambda checked, p=item_path: self.open_file(p)
+                            lambda checked, p=item: self.open_file(p)
                         )
                         menu.addAction(file_action)
         except PermissionError:
@@ -97,7 +95,7 @@ class SystemTrayFileBrowser:
             error_action.setEnabled(False)
             menu.addAction(error_action)
 
-    def populate_submenu(self, submenu, path):
+    def populate_submenu(self, submenu, path: Path):
         if submenu.actions()[0].text() == "Loading...":
             submenu.clear()
             self.add_directory_contents(path, submenu)
@@ -121,12 +119,12 @@ class SystemTrayFileBrowser:
                 )
                 dnd_submenu.addAction(dnd_action)
 
-    def open_file(self, path: str):
+    def open_file(self, path: Path):
         try:
             content = "\n---\n".join(
                 map(
                     lambda d: d["body"],
-                    map(json.loads, Path(path).read_text().splitlines()),
+                    map(json.loads, path.read_text().splitlines()),
                 )
             )
             # Truncate content if it's too long
@@ -147,7 +145,7 @@ class SystemTrayFileBrowser:
 
     def update_icon(self):
         def count_dir(dir_: Path) -> int:
-            if self.is_do_not_disturb_active(str(dir_)):
+            if self.is_do_not_disturb_active(dir_):
                 return 0
             else:
                 count = 0
@@ -159,7 +157,7 @@ class SystemTrayFileBrowser:
                         count += 1
                 return count
 
-        file_count = count_dir(Path(self.root_path))
+        file_count = count_dir(self.root_path)
         if file_count == 0:
             if self.tray_icon is not None:
                 self.tray_icon.hide()
@@ -224,8 +222,8 @@ class SystemTrayFileBrowser:
         # Refresh tray menu to hide the folder if necessary
         self.setup_tray_menu()
 
-    def is_do_not_disturb_active(self, folder_path: str) -> bool:
-        settings_file = Path(folder_path) / ".settings.json"
+    def is_do_not_disturb_active(self, folder_path: Path) -> bool:
+        settings_file = folder_path / ".settings.json"
         if settings_file.exists():
             settings = json.loads(settings_file.read_text())
             return "do_not_disturb_until" in settings and (
@@ -234,8 +232,7 @@ class SystemTrayFileBrowser:
                 > datetime.now()
             )
 
-    def trash(self, path_as_string: str | Path):
-        path = Path(path_as_string)
+    def trash(self, path: Path):
         if path.is_file() and path.name != ".settings.json":
             send2trash(path)
         elif not any(path.rglob(".settings.json")):
@@ -249,4 +246,4 @@ class SystemTrayFileBrowser:
 
 
 if __name__ == "__main__":
-    SystemTrayFileBrowser(sys.argv[1]).run()
+    SystemTrayFileBrowser(Path(sys.argv[1])).run()
