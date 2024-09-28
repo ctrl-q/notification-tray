@@ -1,3 +1,10 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "pyqt5==5.15.11",
+#     "send2trash==1.8.3",
+# ]
+# ///
 import json
 import os
 import sys
