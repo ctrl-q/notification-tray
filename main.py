@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from PyQt5.QtCore import QFileSystemWatcher, Qt, QTimer
@@ -97,7 +97,7 @@ class SystemTrayFileBrowser:
 
             # Re-add the "Move to Trash" action after populating
             trash_action = QAction("Move to Trash", submenu)
-            trash_action.triggered.connect(lambda checked, p=path: send2trash(p))
+            trash_action.triggered.connect(lambda checked, p=path: self.trash(p))
             submenu.addAction(trash_action)
 
             # Add "Do Not Disturb" submenu
@@ -151,7 +151,6 @@ class SystemTrayFileBrowser:
                     else:
                         count += 1
                 return count
-
 
         file_count = count_dir(Path(self.root_path))
         if file_count == 0:
@@ -227,6 +226,16 @@ class SystemTrayFileBrowser:
                 or datetime.fromisoformat(settings["do_not_disturb_until"])
                 > datetime.now()
             )
+
+    def trash(self, path_as_string: str | Path):
+        path = Path(path_as_string)
+        if path.is_file() and path.name != ".settings.json":
+            send2trash(path)
+        elif not any(path.rglob(".settings.json")):
+            send2trash(path)
+        else:
+            with ThreadPoolExecutor() as pool:
+                pool.map(self.trash, path.iterdir())
 
     def run(self):
         sys.exit(self.app.exec_())
