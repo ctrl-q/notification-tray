@@ -30,7 +30,10 @@ class SystemTrayFileBrowser:
 
     def setup_file_watcher(self):
         self.watcher = QFileSystemWatcher(
-            [str(self.root_path), *map(str, self.root_path.rglob("*"))]
+            [
+                str(self.root_path),
+                *map(str, filter(Path.is_dir, self.root_path.rglob("*"))),
+            ]
         )
         self.watcher.directoryChanged.connect(self.on_directory_changed)
 
@@ -47,17 +50,7 @@ class SystemTrayFileBrowser:
     def on_directory_changed(self, path: str):
         self.update_icon()
         self.setup_tray_menu()
-        sub_paths = list(Path(path).rglob("*"))
-        if sub_paths:
-            self.watcher.addPaths(map(str, sub_paths))
-
-        deleted_paths = [
-            path
-            for path in self.watcher.directories()
-            if not Path(path).absolute().is_dir()
-        ]
-        if deleted_paths:
-            self.watcher.removePaths(map(str, deleted_paths))
+        self.watcher.addPaths(map(str, filter(Path.is_dir, Path(path).rglob("*"))))
 
     def setup_tray_menu(self):
         self.tray_menu.clear()
