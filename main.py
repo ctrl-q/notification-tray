@@ -8,6 +8,7 @@
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from PyQt5.QtCore import QFileSystemWatcher, Qt, QTimer
@@ -22,9 +23,9 @@ class SystemTrayFileBrowser:
         self.root_path = root_path
         self.tray_icon = None
         self.tray_menu = QMenu()
+        self.do_not_disturb: dict[Path, datetime | None] = {}
         self.setup_file_watcher()
         self.start_timer()
-
         self.update_icon()
         self.setup_tray_menu()
 
@@ -33,8 +34,12 @@ class SystemTrayFileBrowser:
             [
                 str(self.root_path),
                 *map(str, filter(Path.is_dir, self.root_path.rglob("*"))),
+                *map(str, self.root_path.rglob(".settings.json")),
             ]
         )
+        self.watcher.fileChanged.connect(self.on_settings_file_changed)
+        for settings_file in self.watcher.files():
+            self.on_settings_file_changed(settings_file)
         self.watcher.directoryChanged.connect(self.on_directory_changed)
 
     def start_timer(self):
@@ -52,6 +57,18 @@ class SystemTrayFileBrowser:
         self.setup_tray_menu()
         self.watcher.addPaths(map(str, filter(Path.is_dir, Path(path).rglob("*"))))
 
+    def on_settings_file_changed(self, path: str):
+        path_ = Path(path)
+        if path_.parent in self.do_not_disturb:
+            del self.do_not_disturb[path_.parent]
+        try:
+            if "do_not_disturb_until" in (settings := json.loads(path_.read_text())):
+                self.do_not_disturb[path_.parent] = settings[
+                    "do_not_disturb_until"
+                ] and datetime.fromisoformat(settings["do_not_disturb_until"])
+        except FileNotFoundError:
+            pass
+
     def setup_tray_menu(self):
         self.tray_menu.clear()
         self.add_directory_contents(self.root_path, self.tray_menu)
@@ -64,7 +81,7 @@ class SystemTrayFileBrowser:
     def add_directory_contents(self, path: Path, menu: QMenu):
         try:
             if path.exists():
-                items = sorted(path.iterdir())
+                items = sorted(map(path.joinpath, path.iterdir()))
                 for item in items:
                     if item.is_dir():
                         if not self.is_do_not_disturb_active(item):
@@ -77,6 +94,8 @@ class SystemTrayFileBrowser:
                                     sub, p
                                 )
                             )
+                    elif item.name == ".settings.json":
+                        self.watcher.addPath(item.name)
                     elif item.name != ".notification.wav":
                         file_action = QAction(item.name, menu)
                         file_action.triggered.connect(
@@ -194,14 +213,22 @@ class SystemTrayFileBrowser:
         return QIcon(pixmap)
 
     def set_do_not_disturb(self, folder_path: str, hours: int | None):
-        (Path(folder_path) / ".settings.json").write_text(
+        folder_path_ = Path(folder_path).absolute()
+        settings_file = folder_path_ / ".settings.json"
+        do_not_disturb_ = (
+            None if hours is None else datetime.now(UTC) + timedelta(hours=hours)
+        )
+        self.do_not_disturb[folder_path_] = do_not_disturb_
+        try:
+            existing_settings = json.loads(settings_file.read_text())
+        except FileNotFoundError:
+            existing_settings = {}
+        settings_file.write_text(
             json.dumps(
-                {
-                    "do_not_disturb_until": (
-                        None
-                        if hours is None
-                        else (datetime.utcnow() + timedelta(hours=hours)).isoformat()
-                    )
+                existing_settings
+                | {
+                    "do_not_disturb_until": do_not_disturb_
+                    and do_not_disturb_.isoformat()
                 }
             )
         )
@@ -216,14 +243,21 @@ class SystemTrayFileBrowser:
         self.setup_tray_menu()
 
     def is_do_not_disturb_active(self, folder_path: Path) -> bool:
-        settings_file = folder_path / ".settings.json"
-        if settings_file.exists():
-            settings = json.loads(settings_file.read_text())
-            return "do_not_disturb_until" in settings and (
-                settings["do_not_disturb_until"] is None
-                or datetime.fromisoformat(settings["do_not_disturb_until"])
-                > datetime.now()
-            )
+        for folder in reversed(
+            [
+                folder_path,
+                *map(
+                    self.root_path.joinpath,
+                    folder_path.relative_to(self.root_path).parents,
+                ),
+            ]
+        ):
+            if folder in self.do_not_disturb and (
+                (do_not_disturb_ := self.do_not_disturb[folder]) is None
+                or do_not_disturb_ > datetime.now(UTC)
+            ):
+                return True
+        return False
 
     def trash(self, path: Path):
         if path.is_file() and path.name not in (".settings.json", ".notification.wav"):
