@@ -6,6 +6,7 @@
 # ]
 # ///
 import json
+import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -33,8 +34,13 @@ class SystemTrayFileBrowser:
         self.watcher = QFileSystemWatcher(
             [
                 str(self.root_path),
-                *map(str, filter(Path.is_dir, self.root_path.rglob("*"))),
-                *map(str, self.root_path.rglob(".settings.json")),
+                *map(
+                    str,
+                    filter(
+                        lambda path: path.is_dir() or path.name == ".settings.json",
+                        self.root_path.rglob("*"),
+                    ),
+                ),
             ]
         )
         self.watcher.fileChanged.connect(self.on_settings_file_changed)
@@ -262,13 +268,14 @@ class SystemTrayFileBrowser:
     def trash(self, path: Path):
         if path.is_file() and path.name not in (".settings.json", ".notification.wav"):
             send2trash(path)
-        elif not any(path.rglob(".settings.json")) and not any(
-            path.rglob(".notification.wav")
+        elif any(
+            ".settings.json" in filenames or ".notification.wav" in filenames
+            for _, _, filenames in os.walk(path)
         ):
-            send2trash(path)
-        else:
             with ThreadPoolExecutor() as pool:
                 pool.map(self.trash, path.iterdir())
+        else:
+            send2trash(path)
 
     def run(self):
         sys.exit(self.app.exec_())
