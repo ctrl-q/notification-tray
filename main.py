@@ -77,7 +77,7 @@ class SystemTrayFileBrowser:
                                     sub, p
                                 )
                             )
-                    else:
+                    elif item.name != ".notification.wav":
                         file_action = QAction(item.name, menu)
                         file_action.triggered.connect(
                             lambda checked, p=item: self.open_file(p)
@@ -226,9 +226,11 @@ class SystemTrayFileBrowser:
             )
 
     def trash(self, path: Path):
-        if path.is_file() and path.name != ".settings.json":
+        if path.is_file() and path.name not in (".settings.json", ".notification.wav"):
             send2trash(path)
-        elif not any(path.rglob(".settings.json")):
+        elif not any(path.rglob(".settings.json")) and not any(
+            path.rglob(".notification.wav")
+        ):
             send2trash(path)
         else:
             with ThreadPoolExecutor() as pool:
