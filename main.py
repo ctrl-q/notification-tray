@@ -127,9 +127,9 @@ class SystemTrayFileBrowser:
             dnd_submenu = QMenu("Do Not Disturb", submenu)
             submenu.addMenu(dnd_submenu)
             for text, duration in [
-                ("1 hour", 1),
-                ("8 hours", 8),
-                ("Forever", None),
+                ("1 hour", datetime.now(UTC) + timedelta(hours=1)),
+                ("8 hours", datetime.now(UTC) + timedelta(hours=8)),
+                ("Forever", datetime(9999, 1, 1, tzinfo=UTC)),
             ]:
                 dnd_action = QAction(text, dnd_submenu)
                 dnd_action.triggered.connect(
@@ -218,29 +218,20 @@ class SystemTrayFileBrowser:
         # Create and return the icon
         return QIcon(pixmap)
 
-    def set_do_not_disturb(self, folder_path: str, hours: int | None):
+    def set_do_not_disturb(self, folder_path: str, until: datetime):
         folder_path_ = Path(folder_path).absolute()
         settings_file = folder_path_ / ".settings.json"
-        do_not_disturb_ = (
-            None if hours is None else datetime.now(UTC) + timedelta(hours=hours)
-        )
-        self.do_not_disturb[folder_path_] = do_not_disturb_
+        self.do_not_disturb[folder_path_] = until
         try:
             existing_settings = json.loads(settings_file.read_text())
         except FileNotFoundError:
             existing_settings = {}
         settings_file.write_text(
-            json.dumps(
-                existing_settings
-                | {
-                    "do_not_disturb_until": do_not_disturb_
-                    and do_not_disturb_.isoformat()
-                }
-            )
+            json.dumps(existing_settings | {"do_not_disturb_until": until.isoformat()})
         )
         self.tray_icon.showMessage(
             "Do Not Disturb",
-            f"Do Not Disturb set for {'forever' if not hours else f'{hours} hour(s)'}",
+            f"Do Not Disturb set until {until}",
             QSystemTrayIcon.Information,
             3000,
         )
@@ -249,20 +240,17 @@ class SystemTrayFileBrowser:
         self.setup_tray_menu()
 
     def is_do_not_disturb_active(self, folder_path: Path) -> bool:
-        for folder in reversed(
-            [
-                folder_path,
-                *map(
-                    self.root_path.joinpath,
-                    folder_path.relative_to(self.root_path).parents,
-                ),
-            ]
-        ):
-            if folder in self.do_not_disturb and (
-                (do_not_disturb_ := self.do_not_disturb[folder]) is None
-                or do_not_disturb_ > datetime.now(UTC)
-            ):
-                return True
+        for folder in [
+            folder_path,
+            *map(
+                self.root_path.joinpath,
+                folder_path.relative_to(self.root_path).parents,
+            ),
+        ]:
+            if folder in self.do_not_disturb:
+                return (
+                    do_not_disturb_ := self.do_not_disturb[folder]
+                ) and do_not_disturb_ > datetime.now(UTC)
         return False
 
     def trash(self, path: Path):
