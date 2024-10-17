@@ -266,8 +266,9 @@ class SystemTrayFileBrowser:
         return False
 
     def trash(self, path: Path):
-        if path.is_file() and path.name not in (".settings.json", ".notification.wav"):
-            send2trash(path)
+        if path.is_file():
+            if path.name not in (".settings.json", ".notification.wav"):
+                send2trash(path)
         elif any(
             ".settings.json" in filenames or ".notification.wav" in filenames
             for _, _, filenames in os.walk(path)
