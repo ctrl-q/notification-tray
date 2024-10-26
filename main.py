@@ -1,9 +1,13 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#     "libdbus-to-json",
 #     "pyqt5==5.15.11",
 #     "send2trash==1.8.3",
 # ]
+#
+# [tool.uv.sources]
+# libdbus-to-json = { path = "../libdbus-to-json", editable = true }
 # ///
 import json
 import os
@@ -12,6 +16,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import libdbus_to_json
+import libdbus_to_json.do_not_disturb
 from PyQt5.QtCore import QFileSystemWatcher, Qt, QTimer
 from PyQt5.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import QAction, QApplication, QMenu, QSystemTrayIcon
@@ -67,13 +73,9 @@ class SystemTrayFileBrowser:
         path_ = Path(path)
         if path_.parent in self.do_not_disturb:
             del self.do_not_disturb[path_.parent]
-        try:
-            if "do_not_disturb_until" in (settings := json.loads(path_.read_text())):
-                self.do_not_disturb[path_.parent] = settings[
-                    "do_not_disturb_until"
-                ] and datetime.fromisoformat(settings["do_not_disturb_until"])
-        except FileNotFoundError:
-            pass
+        libdbus_to_json.do_not_disturb.cache_do_not_disturb(
+            path_.parent, cache=self.do_not_disturb
+        )
 
     def setup_tray_menu(self):
         self.tray_menu.clear()
@@ -219,15 +221,8 @@ class SystemTrayFileBrowser:
         return QIcon(pixmap)
 
     def set_do_not_disturb(self, folder_path: str, until: datetime):
-        folder_path_ = Path(folder_path).absolute()
-        settings_file = folder_path_ / ".settings.json"
-        self.do_not_disturb[folder_path_] = until
-        try:
-            existing_settings = json.loads(settings_file.read_text())
-        except FileNotFoundError:
-            existing_settings = {}
-        settings_file.write_text(
-            json.dumps(existing_settings | {"do_not_disturb_until": until.isoformat()})
+        libdbus_to_json.do_not_disturb.write_do_not_disturb(
+            folder_path, until, cache=self.do_not_disturb
         )
         self.tray_icon.showMessage(
             "Do Not Disturb",
@@ -240,18 +235,9 @@ class SystemTrayFileBrowser:
         self.setup_tray_menu()
 
     def is_do_not_disturb_active(self, folder_path: Path) -> bool:
-        for folder in [
-            folder_path,
-            *map(
-                self.root_path.joinpath,
-                folder_path.relative_to(self.root_path).parents,
-            ),
-        ]:
-            if folder in self.do_not_disturb:
-                return (
-                    do_not_disturb_ := self.do_not_disturb[folder]
-                ) and do_not_disturb_ > datetime.now(UTC)
-        return False
+        return libdbus_to_json.do_not_disturb.is_do_not_disturb_active(
+            folder_path, root_path=self.root_path, cache=self.do_not_disturb
+        )
 
     def trash(self, path: Path):
         if path.is_file():
