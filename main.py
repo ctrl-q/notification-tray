@@ -240,12 +240,12 @@ class SystemTrayFileBrowser:
         )
 
     def trash(self, path: Path):
+        protected_files = {".settings.json", ".notification.wav"}
         if path.is_file():
-            if path.name not in (".settings.json", ".notification.wav"):
+            if path.name not in protected_files:
                 send2trash(path)
         elif any(
-            ".settings.json" in filenames or ".notification.wav" in filenames
-            for _, _, filenames in os.walk(path)
+            protected_files.issubset(filenames) for _, _, filenames in os.walk(path)
         ):
             with ThreadPoolExecutor() as pool:
                 pool.map(self.trash, path.iterdir())
