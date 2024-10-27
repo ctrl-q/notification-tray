@@ -173,7 +173,7 @@ class SystemTrayFileBrowser:
                     item = item.resolve()
                     if item.is_dir():
                         count += count_dir(item)
-                    else:
+                    elif item.suffix == ".jsonl":
                         count += 1
                 return count
 
