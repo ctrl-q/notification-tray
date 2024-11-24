@@ -10,7 +10,7 @@
 # ]
 #
 # [tool.uv.sources]
-# libdbus-to-json = { path = "../libdbus-to-json", editable = true }
+# libdbus-to-json = { git = "https://github.com/ctrl-q/libdbus-to-json.git" }
 # ///
 import json
 import os
