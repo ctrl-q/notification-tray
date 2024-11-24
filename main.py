@@ -1,9 +1,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "desktop-notify",
+#     "desktop-notify==1.3.3",
 #     "libdbus-to-json",
-#     "pydub",
+#     "pydub==0.25.1",
 #     "pygobject==3.50.0",
 #     "pyqt5==5.15.11",
 #     "send2trash==1.8.3",
