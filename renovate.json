@@ -1,0 +1,37 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "addLabels": [
+    "dependencies"
+  ],
+  "bumpVersion": "patch",
+  "extends": [
+    ":automergeDisabled",
+    ":enablePreCommit",
+    ":enableVulnerabilityAlerts",
+    ":docker",
+    ":prHourlyLimitNone",
+    "config:best-practices",
+    "docker:enableMajor",
+    "helpers:pinGitHubActionDigestsToSemver",
+    "customManagers:dockerfileVersions",
+    "customManagers:githubActionsVersions",
+    "preview:dockerCompose",
+    "preview:dockerVersions"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "major": {
+    "minimumReleaseAge": "1 month"
+  },
+  "minor": {
+    "minimumReleaseAge": "2 weeks"
+  },
+  "prBodyNotes": [
+    "---",
+    "### Reviewer checklist\n> [!IMPORTANT]\n> Do not skip any item\n- [ ] I have reviewed the entire changelog\n- [ ] If there are new features that could be useful, I have created a PR or a ticket to take advantage of them (link it here)\n- [ ] If there are breaking changes, I've created a PR on top of this branch to take care of them (link it here)"
+  ],
+  "pep723": {
+    "fileMatch": ["^main.py$"]
+  }
+}
