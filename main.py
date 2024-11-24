@@ -4,7 +4,7 @@
 #     "desktop-notify",
 #     "libdbus-to-json",
 #     "pydub",
-#     "pygobject==3.48.2",
+#     "pygobject==3.50.0",
 #     "pyqt5==5.15.11",
 #     "send2trash==1.8.3",
 # ]
