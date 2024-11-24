@@ -227,8 +227,8 @@ class SystemTrayFileBrowser(QObject):
         if path_.parent in self.do_not_disturb:
             del self.do_not_disturb[path_.parent]
         try:
-            libdbus_to_json.do_not_disturb.cache_do_not_disturb(
-                path_.parent, cache=self.do_not_disturb
+            libdbus_to_json.do_not_disturb.cache_datetime_setting(
+                path_.parent, "do_not_disturb_until", cache=self.do_not_disturb
             )
             if (
                 notification_backoff_minutes := json.loads(path_.read_text()).get(
@@ -419,8 +419,8 @@ class SystemTrayFileBrowser(QObject):
         return QIcon(pixmap)
 
     def set_do_not_disturb(self, folder_path: str, until: datetime):
-        libdbus_to_json.do_not_disturb.write_do_not_disturb(
-            folder_path, until, cache=self.do_not_disturb
+        libdbus_to_json.do_not_disturb.write_datetime_setting(
+            folder_path, "do_not_disturb_until", until, cache=self.do_not_disturb
         )
         Notify(
             summary="Do Not Disturb",
@@ -431,12 +431,12 @@ class SystemTrayFileBrowser(QObject):
         self.refresh()
 
     def get_do_not_disturb(self, folder_path: Path) -> datetime | None:
-        return libdbus_to_json.do_not_disturb.get_do_not_disturb(
+        return libdbus_to_json.do_not_disturb.get_datetime_setting(
             folder_path, root_path=self.root_path, cache=self.do_not_disturb
         )
 
     def is_do_not_disturb_active(self, folder_path: Path) -> bool:
-        return libdbus_to_json.do_not_disturb.is_do_not_disturb_active(
+        return libdbus_to_json.do_not_disturb.is_datetime_setting_active(
             folder_path, root_path=self.root_path, cache=self.do_not_disturb
         )
 
