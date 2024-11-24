@@ -87,6 +87,7 @@ class SystemTrayFileBrowser(QObject):
         self.tray_icon = None
         self.tray_menu = QMenu()
         self.do_not_disturb: dict[Path, datetime | None] = {}
+        self.hide_from_tray: dict[Path, datetime | None] = {}
         self.last_notified: dict[Path, int] = {}
         self.notification_backoff_minutes: dict[Path, int] = {}
         self.notification_sounds: set[Path] = set()
@@ -227,9 +228,13 @@ class SystemTrayFileBrowser(QObject):
         if path_.parent in self.do_not_disturb:
             del self.do_not_disturb[path_.parent]
         try:
-            libdbus_to_json.do_not_disturb.cache_datetime_setting(
-                path_.parent, "do_not_disturb_until", cache=self.do_not_disturb
-            )
+            for setting_name, cache in [
+                ("do_not_disturb_until", self.do_not_disturb),
+                ("hide_from_tray_until", self.hide_from_tray),
+            ]:
+                libdbus_to_json.do_not_disturb.cache_datetime_setting(
+                    path_.parent, setting_name, cache=cache
+                )
             if (
                 notification_backoff_minutes := json.loads(path_.read_text()).get(
                     "notification_backoff_minutes"
@@ -264,9 +269,13 @@ class SystemTrayFileBrowser(QObject):
 
     def add_directory_contents(self, path: Path, menu: QMenu):
         def has_notifications(dir_: NotificationFolder) -> bool:
-            return (not self.is_do_not_disturb_active(dir_["path"])) and (
-                (any(dir_["notifications"].values()))
-                or (any(map(has_notifications, dir_["folders"].values())))
+            return (
+                (not self.is_do_not_disturb_active(dir_["path"]))
+                and not self.is_hide_from_tray_active(dir_["path"])
+                and (
+                    (any(dir_["notifications"].values()))
+                    or (any(map(has_notifications, dir_["folders"].values())))
+                )
             )
 
         notifications_cache = self.notification_cache
@@ -365,7 +374,9 @@ class SystemTrayFileBrowser(QObject):
 
     def update_icon(self):
         def count_dir(dir_: NotificationFolder) -> int:
-            if self.is_do_not_disturb_active(dir_["path"]):
+            if self.is_do_not_disturb_active(
+                dir_["path"]
+            ) or self.is_hide_from_tray_active(dir_["path"]):
                 return 0
             else:
                 return sum(
@@ -438,6 +449,11 @@ class SystemTrayFileBrowser(QObject):
     def is_do_not_disturb_active(self, folder_path: Path) -> bool:
         return libdbus_to_json.do_not_disturb.is_datetime_setting_active(
             folder_path, root_path=self.root_path, cache=self.do_not_disturb
+        )
+
+    def is_hide_from_tray_active(self, folder_path: Path) -> bool:
+        return libdbus_to_json.do_not_disturb.is_datetime_setting_active(
+            folder_path, root_path=self.root_path, cache=self.hide_from_tray
         )
 
     def cache_existing_notifications(self):
