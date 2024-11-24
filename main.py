@@ -14,20 +14,44 @@
 # ///
 import json
 import os
+import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Thread
+from typing import Any, TypedDict
 
 import libdbus_to_json
 import libdbus_to_json.do_not_disturb
 from desktop_notify import BaseNotify, glib
 from pydub import AudioSegment
 from pydub.playback import play
-from PyQt5.QtCore import QFileSystemWatcher, Qt, QTimer
+from PyQt5.QtCore import QFileSystemWatcher, QObject, Qt, QTimer, pyqtSlot
+from PyQt5.QtDBus import QDBusConnection
 from PyQt5.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import QAction, QApplication, QMenu, QSystemTrayIcon
 from send2trash import send2trash
+
+
+class Notification(TypedDict):
+    app_name: str
+    replaces_id: int
+    app_icon: str
+    summary: str
+    body: str
+    actions: list[str]
+    hints: dict[str, Any]
+    expire_timeout: int
+    id: int
+    path: str
+    at: datetime
+
+
+class NotificationFolder(TypedDict):
+    folders: dict[str, "NotificationFolder"]
+    notifications: dict[str, list[Notification]]
+    path: Path
 
 
 # the Notify was desktop_notify.glib incorrectly subclasses BaseServer, so I have to re-define it myself
@@ -55,8 +79,9 @@ class Notify(BaseNotify):
         return glib.Server
 
 
-class SystemTrayFileBrowser:
-    def __init__(self, root_path: Path):
+class SystemTrayFileBrowser(QObject):
+    def __init__(self, root_path: Path, parent: QObject | None = None):
+        super().__init__(parent)
         self.app = QApplication([])
         self.root_path = root_path
         self.tray_icon = None
@@ -67,8 +92,60 @@ class SystemTrayFileBrowser:
         self.notification_sounds: set[Path] = set()
         self.notifier = glib.Server("notification-tray")
         self.started_at = datetime.now(UTC)
+        self.notification_cache = NotificationFolder(
+            folders={}, notifications={}, path=self.root_path
+        )
+        self.cache_existing_notifications()
         self.setup_file_watcher()
         self.start_timer()
+        self.refresh()
+        QDBusConnection.sessionBus().connect(
+            "",
+            "/com/example/DbusNotificationsToJson/notifications",
+            "com.example.DbusNotificationsToJson.NotificationSent",
+            "NotificationSent",
+            self.cache,
+        )
+        self.threads: list[Thread] = []
+        self.app.aboutToQuit.connect(lambda: [thread.join() for thread in self.threads])
+
+    @pyqtSlot(str)
+    def cache(self, signal: str):
+        notification = Notification(json.loads(signal), at=datetime.now(UTC))
+        notifications = self.notification_cache
+        for folder in (
+            Path(notification["path"])
+            .relative_to(self.notification_cache["path"])
+            .parent.parts
+        ):
+            notifications = notifications["folders"].setdefault(
+                folder,
+                NotificationFolder(
+                    folders={}, notifications={}, path=notifications["path"] / folder
+                ),
+            )
+        path = Path(notification["path"])
+        notifications["notifications"].setdefault(path.name, []).append(notification)
+        if self.is_do_not_disturb_active(
+            path.parent
+        ) or self.get_notification_backoff_minutes(path.parent):
+            # TODO couldn't figure out how to use QtDbus for this
+            subprocess.call(
+                [
+                    "gdbus",
+                    "call",
+                    "--session",
+                    "--dest=org.freedesktop.Notifications",
+                    "--object-path=/org/freedesktop/Notifications",
+                    "--method=org.freedesktop.Notifications.CloseNotification",
+                    str(notification["id"]),
+                ]
+            )
+        else:
+            self.notify([notification])
+        self.refresh()
+
+    def refresh(self):
         self.update_icon()
         self.setup_tray_menu()
 
@@ -78,55 +155,60 @@ class SystemTrayFileBrowser:
                 str(self.root_path),
                 *map(
                     str,
-                    filter(
-                        lambda path: path.is_dir() or path.name == ".settings.json",
-                        self.root_path.rglob("*"),
-                    ),
+                    self.root_path.rglob(".settings.json"),
                 ),
             ]
         )
         self.watcher.fileChanged.connect(self.on_settings_file_changed)
         for settings_file in self.watcher.files():
             self.on_settings_file_changed(settings_file)
-        self.watcher.directoryChanged.connect(self.on_directory_changed)
 
     def start_timer(self):
         self.timer = QTimer()
         self.timer.setInterval(60000)  # Check every minute
-        self.timer.timeout.connect(self.check_do_not_disturb_status)
+        self.timer.timeout.connect(self.refresh)
         self.timer.timeout.connect(self.batch_notify)
         self.timer.start()
 
-    def check_do_not_disturb_status(self):
-        # Refresh the tray menu to recheck the status of folders
-        self.setup_tray_menu()
-
     def batch_notify(self):
-        for parent, _, files in os.walk(self.root_path):
-            parent = Path(parent)
-            new_notifications: list[Path] = []
-            for file in files:
-                file = parent / file
-                if (
-                    file.suffix == (".jsonl")
-                    and not self.is_do_not_disturb_active(parent)
-                    and (
-                        notification_backoff_minutes := self.get_notification_backoff_minutes(
-                            parent
-                        )
-                        > 0
+        def process(folder: NotificationFolder):
+            self.last_notified.setdefault(folder["path"], -1)
+            new_notifications: list[Notification] = []
+            for notifications in folder["notifications"].values():
+                if notifications:
+                    at = notifications[-1]["at"]
+                    id = notifications[-1]["id"]
+                    notification_backoff_minutes = (
+                        self.get_notification_backoff_minutes(folder["path"])
                     )
-                    and (
-                        datetime.now(UTC)
-                        - (datetime.fromtimestamp(os.stat(parent / file).st_mtime, UTC))
-                    ).total_seconds()
-                    / 60
-                    <= notification_backoff_minutes
-                ):
-                    new_notifications.append(file)
+                    minutes_since_last_notification = (
+                        datetime.now(UTC) - at
+                    ).total_seconds() // 60
+                    if not self.is_do_not_disturb_active(folder["path"]) and (
+                        (
+                            notification_backoff_minutes > 0
+                            and minutes_since_last_notification
+                            <= notification_backoff_minutes
+                        )
+                        or (
+                            # we just came back from DnD
+                            (do_not_disturb := self.get_do_not_disturb(folder["path"]))
+                            and do_not_disturb >= self.started_at
+                            and at >= do_not_disturb
+                            and id > self.last_notified[folder["path"]]
+                        )
+                    ):
+                        new_notifications.extend(notifications)
 
             if new_notifications:
-                self.open_files(new_notifications, expires_in_milliseconds=9999999)
+                self.notify(
+                    new_notifications,
+                    expires_in_milliseconds=9999999,
+                )
+            with ThreadPoolExecutor() as pool:
+                pool.map(process, folder["folders"].values())
+
+        process(self.notification_cache)
 
     def get_notification_backoff_minutes(self, folder_path: Path) -> int:
         for folder in [
@@ -139,33 +221,6 @@ class SystemTrayFileBrowser:
             if folder in self.notification_backoff_minutes:
                 return self.notification_backoff_minutes[folder]
         return 0
-
-    def on_directory_changed(self, path: str):
-        self.update_icon()
-        self.setup_tray_menu()
-        for parent, directories, files in os.walk(path):
-            if directories:
-                self.watcher.addPaths(
-                    (os.path.join(parent, directory) for directory in directories)
-                )
-            parent = Path(parent)
-            max_id = self.last_notified.setdefault(parent, -1)
-            # Notify individually for every notification since last_notified
-            for file in files:
-                file = parent / file
-                if (
-                    file.suffix == (".jsonl")
-                    and not self.is_do_not_disturb_active(parent)
-                    and self.get_notification_backoff_minutes(parent) == 0
-                    and datetime.fromtimestamp(file.stat().st_mtime, UTC)
-                    >= self.started_at
-                    and (id := int(file.stem.split("-").pop()))
-                    > self.last_notified[parent]
-                ):
-                    self.open_files([file])
-                    max_id = max(id, max_id)
-
-            self.last_notified[parent] = max(self.last_notified[parent], max_id)
 
     def on_settings_file_changed(self, path: str):
         path_ = Path(path)
@@ -208,35 +263,30 @@ class SystemTrayFileBrowser:
         self.tray_menu.addAction(exit_action)
 
     def add_directory_contents(self, path: Path, menu: QMenu):
-        try:
-            if path.exists():
-                items = sorted(map(path.joinpath, path.iterdir()))
-                for item in items:
-                    if item.is_dir():
-                        if not self.is_do_not_disturb_active(item):
-                            submenu = QMenu(item.name, menu)
-                            menu.addMenu(submenu)
-                            placeholder = QAction("Loading...", submenu)
-                            submenu.addAction(placeholder)
-                            submenu.aboutToShow.connect(
-                                lambda sub=submenu, p=item: self.populate_submenu(
-                                    sub, p
-                                )
-                            )
-                    elif item.name == ".settings.json":
-                        self.watcher.addPath(item.name)
-                    elif item.name == ".notification.wav":
-                        self.notification_sounds.add(item)
-                    else:
-                        file_action = QAction(item.name, menu)
-                        file_action.triggered.connect(
-                            lambda checked, p=item: self.open_files([p])
-                        )
-                        menu.addAction(file_action)
-        except PermissionError:
-            error_action = QAction("Permission Denied", menu)
-            error_action.setEnabled(False)
-            menu.addAction(error_action)
+        def has_notifications(dir_: NotificationFolder) -> bool:
+            return (not self.is_do_not_disturb_active(dir_["path"])) and (
+                (any(dir_["notifications"].values()))
+                or (any(map(has_notifications, dir_["folders"].values())))
+            )
+
+        notifications_cache = self.notification_cache
+        for folder in path.relative_to(self.root_path).parts:
+            notifications_cache = notifications_cache["folders"][folder]
+        for name, folder in sorted(notifications_cache["folders"].items()):
+            if has_notifications(folder):
+                submenu = QMenu(name, menu)
+                menu.addMenu(submenu)
+                placeholder = QAction("Loading...", submenu)
+                submenu.addAction(placeholder)
+                submenu.aboutToShow.connect(
+                    lambda sub=submenu, p=folder["path"]: self.populate_submenu(sub, p)
+                )
+        for name, notifications in notifications_cache["notifications"].items():
+            file_action = QAction(name, menu)
+            file_action.triggered.connect(
+                lambda checked, p=notifications: self.notify(p)
+            )
+            menu.addAction(file_action)
 
     def populate_submenu(self, submenu, path: Path):
         if submenu.actions()[0].text() == "Loading...":
@@ -262,14 +312,12 @@ class SystemTrayFileBrowser:
                 )
                 dnd_submenu.addAction(dnd_action)
 
-    def open_files(self, paths: list[Path], expires_in_milliseconds: int = 5000):
+    def notify(
+        self, notifications: list[Notification], expires_in_milliseconds: int = 5000
+    ):
         try:
-            json_lines: list[dict[str, str]] = []
-            for path in paths:
-                for line in path.read_text().splitlines():
-                    json_lines.append(json.loads(line))
-            if json_lines:
-                app_name = json_lines[-1]["app_name"]
+            if notifications:
+                app_name = notifications[-1]["app_name"]
                 content = "\n---\n".join(
                     map(
                         lambda d: "\n".join(
@@ -281,50 +329,53 @@ class SystemTrayFileBrowser:
                                 ],
                             )
                         ),
-                        json_lines,
+                        notifications,
                     ),
                 )
                 # Truncate content if it's too long
                 if len(content) >= 1000:
                     content = content[:997] + "..."
 
-                self.play_notification_sound(paths[-1].parent)
+                self.play_notification_sound(Path(notifications[-1]["path"]).parent)
                 Notify(
                     summary=(
                         app_name
-                        if len(json_lines) == 1
-                        else f"{len(json_lines)} new notifications from {app_name}"
+                        if len(notifications) == 1
+                        else f"{len(notifications)} new notifications from {app_name}"
                     ),
                     body=content,
                     timeout=max(
-                        *(int(d.get("expire_timeout", -1)) for d in json_lines),
+                        *(int(d.get("expire_timeout", -1)) for d in notifications),
                         expires_in_milliseconds,
                     ),
-                ).set_id(json_lines[-1]["id"]).set_server(self.notifier).show()
+                ).set_id(notifications[-1]["id"]).set_server(self.notifier).show()
+                for notification in notifications:
+                    parent = Path(notification["path"]).parent
+                    self.last_notified[parent] = max(
+                        self.last_notified.setdefault(parent, -1), notification["id"]
+                    )
 
         except Exception as e:
-            self.play_notification_sound(paths[-1].parent)
+            self.play_notification_sound(Path(notifications[-1]["path"]).parent)
             Notify(
                 summary="Error",
-                body=f"Unable to read files: {str(e)}",
+                body=f"Unable to read notifications: {str(e)}",
                 icon="error",
             ).set_server(self.notifier).show()
 
     def update_icon(self):
-        def count_dir(dir_: Path) -> int:
-            if self.is_do_not_disturb_active(dir_):
+        def count_dir(dir_: NotificationFolder) -> int:
+            if self.is_do_not_disturb_active(dir_["path"]):
                 return 0
             else:
-                count = 0
-                for item in dir_.iterdir():
-                    item = item.resolve()
-                    if item.is_dir():
-                        count += count_dir(item)
-                    elif item.suffix == ".jsonl":
-                        count += 1
-                return count
+                return sum(
+                    [
+                        *map(count_dir, dir_["folders"].values()),
+                        *map(len, dir_["notifications"].values()),
+                    ]
+                )
 
-        file_count = count_dir(self.root_path)
+        file_count = count_dir(self.notification_cache)
         if file_count == 0:
             if self.tray_icon is not None:
                 self.tray_icon.hide()
@@ -377,8 +428,7 @@ class SystemTrayFileBrowser:
             icon="dialog-information",
         ).set_server(self.notifier).show()
 
-        # Refresh tray menu to hide the folder if necessary
-        self.setup_tray_menu()
+        self.refresh()
 
     def get_do_not_disturb(self, folder_path: Path) -> datetime | None:
         return libdbus_to_json.do_not_disturb.get_do_not_disturb(
@@ -390,18 +440,62 @@ class SystemTrayFileBrowser:
             folder_path, root_path=self.root_path, cache=self.do_not_disturb
         )
 
+    def cache_existing_notifications(self):
+        for dirpath, _, filenames in os.walk(self.root_path):
+            dirpath = Path(dirpath)
+            filenames = [f for f in filenames if f.endswith(".json") and f != ".settings.json"]
+            if filenames:
+                notifications = self.notification_cache
+                for folder in dirpath.relative_to(self.root_path).parts:
+                    notifications = notifications["folders"].setdefault(
+                        folder,
+                        NotificationFolder(
+                            folders={},
+                            notifications={},
+                            path=notifications["path"] / folder,
+                        ),
+                    )
+                for filename in filenames:
+                    path = dirpath / filename
+                    with path.open() as f:
+                        notifications["notifications"][filename] = [
+                            Notification(
+                                json.loads(line)
+                                | {
+                                    "path": path,
+                                    "at": datetime.fromtimestamp(
+                                        path.stat().st_mtime, UTC
+                                    ),
+                                }
+                            )
+                            for line in f
+                        ]
+
     def trash(self, path: Path):
-        protected_files = {".settings.json", ".notification.wav"}
+        notifications = self.notification_cache
+        for folder in path.relative_to(self.root_path).parent.parts:
+            notifications = notifications["folders"][folder]
         if path.is_file():
-            if path.name not in protected_files:
+            if path.suffix == ".json" and path.name != ".settings.json":
                 send2trash(path)
-        elif any(
-            protected_files.issubset(filenames) for _, _, filenames in os.walk(path)
-        ):
-            with ThreadPoolExecutor() as pool:
-                pool.map(self.trash, path.iterdir())
+                del notifications["notifications"][path.name]
         else:
-            send2trash(path)
+            if not list(path.rglob(".settings.json")) and not list(
+                path.rglob(".notification.wav")
+            ):
+                send2trash(path)
+                del notifications["folders"][path.name]
+            else:
+                notifications = notifications["folders"][path.name]
+                for folder in notifications["folders"].values():
+                    thread = Thread(target=self.trash, args=(folder["path"],))
+                    thread.start()
+                    self.threads.append(thread)
+                for file in notifications["notifications"]:
+                    thread = Thread(target=self.trash, args=(path / file,))
+                    thread.start()
+                    self.threads.append(thread)
+        self.refresh()
 
     def run(self):
         sys.exit(self.app.exec_())
