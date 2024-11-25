@@ -103,7 +103,7 @@ class SystemTrayFileBrowser(QObject):
         QDBusConnection.sessionBus().connect(
             "",
             "/com/example/DbusNotificationsToJson/notifications",
-            "com.example.DbusNotificationsToJson.NotificationSent",
+            "com.example.DbusNotificationsToJson",
             "NotificationSent",
             self.cache,
         )
