@@ -52,7 +52,7 @@ class Notification(TypedDict):
 
 class NotificationFolder(TypedDict):
     folders: dict[str, "NotificationFolder"]
-    notifications: dict[str, list[Notification]]
+    notifications: dict[str, Notification]
     path: Path
 
 
@@ -131,7 +131,7 @@ class SystemTrayFileBrowser(QObject):
                 ),
             )
         path = Path(notification["path"])
-        notifications["notifications"].setdefault(path.name, []).append(notification)
+        notifications["notifications"][path.name] = notification
         if self.is_do_not_disturb_active(
             path.parent
         ) or self.get_notification_backoff_minutes(path.parent):
@@ -180,31 +180,30 @@ class SystemTrayFileBrowser(QObject):
         def process(folder: NotificationFolder):
             self.last_notified.setdefault(folder["path"], -1)
             new_notifications: list[Notification] = []
-            for notifications in folder["notifications"].values():
-                if notifications:
-                    at = notifications[-1]["at"]
-                    id = notifications[-1]["id"]
-                    notification_backoff_minutes = (
-                        self.get_notification_backoff_minutes(folder["path"])
+            for notification in folder["notifications"].values():
+                at = notification["at"]
+                id = notification["id"]
+                notification_backoff_minutes = self.get_notification_backoff_minutes(
+                    folder["path"]
+                )
+                minutes_since_last_notification = (
+                    datetime.now(UTC) - at
+                ).total_seconds() // 60
+                if not self.is_do_not_disturb_active(folder["path"]) and (
+                    (
+                        notification_backoff_minutes > 0
+                        and minutes_since_last_notification
+                        <= notification_backoff_minutes
                     )
-                    minutes_since_last_notification = (
-                        datetime.now(UTC) - at
-                    ).total_seconds() // 60
-                    if not self.is_do_not_disturb_active(folder["path"]) and (
-                        (
-                            notification_backoff_minutes > 0
-                            and minutes_since_last_notification
-                            <= notification_backoff_minutes
-                        )
-                        or (
-                            # we just came back from DnD
-                            (do_not_disturb := self.get_do_not_disturb(folder["path"]))
-                            and do_not_disturb >= self.started_at
-                            and at >= do_not_disturb
-                            and id > self.last_notified[folder["path"]]
-                        )
-                    ):
-                        new_notifications.extend(notifications)
+                    or (
+                        # we just came back from DnD
+                        (do_not_disturb := self.get_do_not_disturb(folder["path"]))
+                        and do_not_disturb >= self.started_at
+                        and at >= do_not_disturb
+                        and id > self.last_notified[folder["path"]]
+                    )
+                ):
+                    new_notifications.append(notification)
 
             if new_notifications:
                 self.notify(
@@ -278,7 +277,7 @@ class SystemTrayFileBrowser(QObject):
                 (not self.is_do_not_disturb_active(dir_["path"]))
                 and not self.is_hide_from_tray_active(dir_["path"])
                 and (
-                    (any(dir_["notifications"].values()))
+                    dir_["notifications"]
                     or (any(map(has_notifications, dir_["folders"].values())))
                 )
             )
@@ -295,10 +294,10 @@ class SystemTrayFileBrowser(QObject):
                 submenu.aboutToShow.connect(
                     lambda sub=submenu, p=folder["path"]: self.populate_submenu(sub, p)
                 )
-        for name, notifications in notifications_cache["notifications"].items():
+        for name, notification in notifications_cache["notifications"].items():
             file_action = QAction(name, menu)
             file_action.triggered.connect(
-                lambda checked, p=notifications: self.notify(p)
+                lambda checked, p=notification: self.notify([p])
             )
             menu.addAction(file_action)
 
@@ -322,7 +321,9 @@ class SystemTrayFileBrowser(QObject):
             ]:
                 dnd_action = QAction(text, dnd_submenu)
                 dnd_action.triggered.connect(
-                    lambda checked, p=path, d=duration: self.set_do_not_disturb(p, d)
+                    lambda checked, p=str(path), d=duration: self.set_do_not_disturb(
+                        p, d
+                    )
                 )
                 dnd_submenu.addAction(dnd_action)
 
@@ -384,11 +385,8 @@ class SystemTrayFileBrowser(QObject):
             ) or self.is_hide_from_tray_active(dir_["path"]):
                 return 0
             else:
-                return sum(
-                    [
-                        *map(count_dir, dir_["folders"].values()),
-                        *map(len, dir_["notifications"].values()),
-                    ]
+                return len(dir_["notifications"]) + sum(
+                    map(count_dir, dir_["folders"].values()),
                 )
 
         file_count = count_dir(self.notification_cache)
@@ -464,7 +462,9 @@ class SystemTrayFileBrowser(QObject):
     def cache_existing_notifications(self):
         for dirpath, _, filenames in os.walk(self.root_path):
             dirpath = Path(dirpath)
-            filenames = [f for f in filenames if f.endswith(".json") and f != ".settings.json"]
+            filenames = [
+                f for f in filenames if f.endswith(".json") and f != ".settings.json"
+            ]
             if filenames:
                 notifications = self.notification_cache
                 for folder in dirpath.relative_to(self.root_path).parts:
@@ -478,19 +478,13 @@ class SystemTrayFileBrowser(QObject):
                     )
                 for filename in filenames:
                     path = dirpath / filename
-                    with path.open() as f:
-                        notifications["notifications"][filename] = [
-                            Notification(
-                                json.loads(line)
-                                | {
-                                    "path": path,
-                                    "at": datetime.fromtimestamp(
-                                        path.stat().st_mtime, UTC
-                                    ),
-                                }
-                            )
-                            for line in f
-                        ]
+                    notifications["notifications"][filename] = Notification(
+                        json.loads(path.read_text())
+                        | {
+                            "path": path,
+                            "at": datetime.fromtimestamp(path.stat().st_mtime, UTC),
+                        }
+                    )
 
     def trash(self, path: Path):
         notifications = self.notification_cache
