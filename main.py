@@ -12,8 +12,10 @@
 # [tool.uv.sources]
 # libdbus-to-json = { git = "https://github.com/ctrl-q/libdbus-to-json.git" }
 # ///
+import base64
 import json
 import os
+import pickle
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -105,14 +107,17 @@ class SystemTrayFileBrowser(QObject):
             "/com/example/DbusNotificationsToJson/notifications",
             "com.example.DbusNotificationsToJson",
             "NotificationSent",
+            "s",
             self.cache,
         )
         self.threads: list[Thread] = []
         self.app.aboutToQuit.connect(lambda: [thread.join() for thread in self.threads])
 
     @pyqtSlot(str)
-    def cache(self, signal: str):
-        notification = Notification(json.loads(signal), at=datetime.now(UTC))
+    def cache(self, payload: str):
+        notification = Notification(
+            pickle.loads(base64.b64decode(payload)), at=datetime.now(UTC)
+        )
         notifications = self.notification_cache
         for folder in (
             Path(notification["path"])
