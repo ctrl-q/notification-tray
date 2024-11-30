@@ -110,8 +110,6 @@ class SystemTrayFileBrowser(QObject):
             "s",
             self.cache,
         )
-        self.threads: list[Thread] = []
-        self.app.aboutToQuit.connect(lambda: [thread.join() for thread in self.threads])
 
     @pyqtSlot(str)
     def cache(self, payload: str):
@@ -503,13 +501,11 @@ class SystemTrayFileBrowser(QObject):
             else:
                 notifications = notifications["folders"][path.name]
                 for folder in notifications["folders"].values():
-                    thread = Thread(target=self.trash, args=(folder["path"],))
-                    thread.start()
-                    self.threads.append(thread)
+                    Thread(
+                        target=self.trash, args=(folder["path"],), daemon=True
+                    ).start()                    
                 for file in notifications["notifications"]:
-                    thread = Thread(target=self.trash, args=(path / file,))
-                    thread.start()
-                    self.threads.append(thread)
+                    Thread(target=self.trash, args=(path / file,), daemon=True).start()
         self.refresh()
 
     def run(self):
