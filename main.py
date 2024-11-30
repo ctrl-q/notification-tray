@@ -42,8 +42,6 @@ class Notification(TypedDict):
     app_icon: str
     summary: str
     body: str
-    actions: list[str]
-    hints: dict[str, Any]
     expire_timeout: int
     id: int
     path: str
@@ -107,14 +105,31 @@ class SystemTrayFileBrowser(QObject):
             "/com/example/DbusNotificationsToJson/notifications",
             "com.example.DbusNotificationsToJson",
             "NotificationSent",
-            "s",
             self.cache,
         )
 
-    @pyqtSlot(str)
-    def cache(self, payload: str):
+    @pyqtSlot(str, int, str, str, str, int, int, str)
+    def cache(
+        self,
+        app_name: str,
+        replaces_id: int,
+        app_icon: str,
+        summary: str,
+        body: str,
+        expire_timeout: int,
+        id: int,
+        path: str,
+    ):
         notification = Notification(
-            pickle.loads(base64.b64decode(payload)), at=datetime.now(UTC)
+            app_name=app_name,
+            replaces_id=replaces_id,
+            app_icon=app_icon,
+            summary=summary,
+            body=body,
+            expire_timeout=expire_timeout,
+            id=id,
+            path=path,
+            at=datetime.now(UTC),
         )
         notifications = self.notification_cache
         for folder in (
@@ -128,11 +143,11 @@ class SystemTrayFileBrowser(QObject):
                     folders={}, notifications={}, path=notifications["path"] / folder
                 ),
             )
-        path = Path(notification["path"])
-        notifications["notifications"][path.name] = notification
+        path_ = Path(notification["path"])
+        notifications["notifications"][path_.name] = notification
         if self.is_do_not_disturb_active(
-            path.parent
-        ) or self.get_notification_backoff_minutes(path.parent):
+            path_.parent
+        ) or self.get_notification_backoff_minutes(path_.parent):
             # TODO couldn't figure out how to use QtDbus for this
             subprocess.call(
                 [
@@ -503,7 +518,7 @@ class SystemTrayFileBrowser(QObject):
                 for folder in notifications["folders"].values():
                     Thread(
                         target=self.trash, args=(folder["path"],), daemon=True
-                    ).start()                    
+                    ).start()
                 for file in notifications["notifications"]:
                     Thread(target=self.trash, args=(path / file,), daemon=True).start()
         self.refresh()
