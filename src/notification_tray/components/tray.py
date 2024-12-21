@@ -1,15 +1,24 @@
+import json
+import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Iterable
 
 import libdbus_to_json.do_not_disturb
-from notification_tray.components.notification_cacher import NotificationCacher
-from notification_tray.components.notifier import Notifier, Notify
-from notification_tray.types.notification import NotificationFolder
-from notification_tray.utils.settings import (is_do_not_disturb_active,
-                                              is_hide_from_tray_active)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import QAction, QApplication, QMenu, QSystemTrayIcon
+
+from notification_tray.components.notification_cacher import NotificationCacher
+from notification_tray.components.notifier import Notifier
+from notification_tray.types.notification import NotificationFolder
+from notification_tray.utils.logging import log_input_and_output
+from notification_tray.utils.settings import (is_do_not_disturb_active,
+                                              is_hide_from_tray_active)
+
+from ..types.notification import CachedNotification
+
+logger = logging.getLogger(__name__)
 
 
 class Tray:
@@ -18,28 +27,33 @@ class Tray:
         root_path: Path,
         do_not_disturb: libdbus_to_json.do_not_disturb.Cache,
         hide_from_tray: libdbus_to_json.do_not_disturb.Cache,
+        notification_backoff_minutes: dict[Path, int],
         notifier: Notifier,
         notification_cacher: NotificationCacher,
         app: QApplication,
     ) -> None:
         self.do_not_disturb = do_not_disturb
         self.hide_from_tray = hide_from_tray
+        self.notification_backoff_minutes = notification_backoff_minutes
         self.root_path = root_path
         self.tray_icon: QSystemTrayIcon | None = None
         self.tray_menu = QMenu()
         self.notifier = notifier
         self.app = app
         self.notification_cacher = notification_cacher
-        self.notification_cacher.notification_cached.connect(self.refresh)
-        self.refresh()
+        logger.info(f"Started tray with root path {root_path}")
 
     def update_icon(self):
+        logger.debug("Updating tray icon")
+
         def count_dir(dir_: NotificationFolder) -> int:
+            logger.debug(f"Counting notifications in {dir_['path']}")
             if is_do_not_disturb_active(
                 self.root_path, dir_["path"], self.do_not_disturb
             ) or is_hide_from_tray_active(
                 self.root_path, dir_["path"], self.hide_from_tray
             ):
+                logger.debug(f"DnD or hide from tray is active. Skipping")
                 return 0
             else:
                 return len(dir_["notifications"]) + sum(
@@ -96,15 +110,13 @@ class Tray:
         # Add exit option
         exit_action = QAction("Exit", self.tray_menu)
         exit_action.triggered.connect(self.app.quit)
-        self.tray_menu.addAction(exit_action) # type: ignore
+        self.tray_menu.addAction(exit_action)  # type: ignore
 
     def add_directory_contents(self, path: Path, menu: QMenu):
         def has_notifications(dir_: NotificationFolder) -> bool:
             return (
-                (
-                    not is_do_not_disturb_active(
-                        self.root_path, dir_["path"], self.do_not_disturb
-                    )
+                not is_do_not_disturb_active(
+                    self.root_path, dir_["path"], self.do_not_disturb
                 )
                 and not is_hide_from_tray_active(
                     self.root_path, dir_["path"], self.hide_from_tray
@@ -123,18 +135,19 @@ class Tray:
                 submenu = QMenu(name, menu)
                 menu.addMenu(submenu)
                 placeholder = QAction("Loading...", submenu)
-                submenu.addAction(placeholder) # type: ignore
+                submenu.addAction(placeholder)  # type: ignore
                 submenu.aboutToShow.connect(
-                    lambda sub=submenu, p=folder["path"]: self.populate_submenu(sub, p) # type: ignore
+                    lambda sub=submenu, f=folder: self.populate_submenu(sub, f)  # type: ignore
                 )
         for name, notification in notifications_cache["notifications"].items():
             file_action = QAction(name, menu)
             file_action.triggered.connect(
-                lambda checked, p=notification: self.notifier.notify([p]) # type: ignore
+                lambda checked, p=notification: self.notifier.notify(p, is_batch=True)  # type: ignore
             )
-            menu.addAction(file_action) # type: ignore
+            menu.addAction(file_action)  # type: ignore
 
-    def populate_submenu(self, submenu: QMenu, path: Path):
+    def populate_submenu(self, submenu: QMenu, folder: NotificationFolder):
+        path = folder["path"]
         if submenu.actions()[0].text() == "Loading...":
             submenu.clear()
             self.add_directory_contents(path, submenu)
@@ -142,9 +155,15 @@ class Tray:
             # Re-add the "Move to Trash" action after populating
             trash_action = QAction("Move to Trash", submenu)
             trash_action.triggered.connect(
-                lambda checked, p=path: self.notification_cacher.trash(p) # type: ignore
+                lambda checked, p=path: self.notification_cacher.trash(p)  # type: ignore
             )
-            submenu.addAction(trash_action) # type: ignore
+            submenu.addAction(trash_action)  # type: ignore
+
+            show_all_action = QAction("Show All", submenu)
+            show_all_action.triggered.connect(
+                lambda checked, f=folder: self.notify(f)  # type: ignore
+            )
+            submenu.addAction(show_all_action)  # type: ignore
 
             # Add "Do Not Disturb" submenu
             dnd_submenu = QMenu("Do Not Disturb", submenu)
@@ -156,24 +175,84 @@ class Tray:
             ]:
                 dnd_action = QAction(text, dnd_submenu)
                 dnd_action.triggered.connect(
-                    lambda checked, p=str(path), d=duration: self.set_do_not_disturb( # type: ignore
-                        p, d
-                    ) # type: ignore
+                    lambda checked, p=str(path), d=duration: self.update_datetime_setting(  # type: ignore
+                        "do_not_disturb", p, d, cache=self.do_not_disturb
+                    )  # type: ignore
                 )
-                dnd_submenu.addAction(dnd_action) # type: ignore
+                dnd_submenu.addAction(dnd_action)  # type: ignore
 
-    def set_do_not_disturb(self, folder_path: str, until: datetime):
-        libdbus_to_json.do_not_disturb.write_datetime_setting(
-            folder_path, "do_not_disturb_until", until, cache=self.do_not_disturb
+            # Add "Hide From Tray" submenu
+            dnd_submenu = QMenu("Hide From Tray", submenu)
+            submenu.addMenu(dnd_submenu)
+            for text, duration in [
+                ("1 hour", datetime.now(UTC) + timedelta(hours=1)),
+                ("8 hours", datetime.now(UTC) + timedelta(hours=8)),
+                ("Forever", datetime(9999, 1, 1, tzinfo=UTC)),
+            ]:
+                dnd_action = QAction(text, dnd_submenu)
+                dnd_action.triggered.connect(
+                    lambda checked, p=str(path), d=duration: self.update_datetime_setting(  # type: ignore
+                        "hide_from_tray_until", p, d, cache=self.hide_from_tray
+                    )  # type: ignore
+                )
+                dnd_submenu.addAction(dnd_action)  # type: ignore
+
+            # Add "Batch notifications" submenu
+            dnd_submenu = QMenu("Batch Notifications", submenu)
+            submenu.addMenu(dnd_submenu)
+            for text, minutes in [
+                ("Every minute", 1),
+                ("Every 5 minutes", 5),
+                ("Every 10 minutes", 10),
+            ]:
+                dnd_action = QAction(text, dnd_submenu)
+                dnd_action.triggered.connect(
+                    lambda checked, p=path, m=minutes: self.update_notification_backoff_minutes(  # type: ignore
+                        p, m
+                    )  # type: ignore
+                )
+                dnd_submenu.addAction(dnd_action)  # type: ignore
+
+    def notify(self, folder: NotificationFolder):
+        def get_notifications(
+            folder: NotificationFolder,
+        ) -> Iterable[CachedNotification]:
+            yield from folder["notifications"].values()
+            for folder in folder["folders"].values():
+                yield from get_notifications(folder)
+
+        logger.info(f"Displaying all notifications for folder {folder['path']}")
+        self.notifier.notify(*get_notifications(folder), is_batch=True)
+
+    @log_input_and_output(logging.DEBUG)
+    def update_notification_backoff_minutes(self, folder_path: Path, minutes: int):
+        folder_path_ = Path(folder_path).absolute()
+        settings_file = folder_path_ / ".settings.json"
+        self.notification_backoff_minutes[folder_path_] = minutes
+        try:
+            existing_settings = json.loads(settings_file.read_text())
+        except FileNotFoundError:
+            existing_settings = {}
+        settings_file.write_text(
+            json.dumps(existing_settings | {"notification_backoff_minutes": minutes})
         )
-        self.notifier
-        Notify(
-            summary="Do Not Disturb",
-            body=f"Do Not Disturb set until {until}",
-            icon="dialog-information",
-        ).set_server(self.notifier.server).show() # type: ignore
 
-        self.refresh()
+    @log_input_and_output(logging.DEBUG)
+    def update_datetime_setting(
+        self,
+        setting_name: str,
+        folder_path: str,
+        until: datetime,
+        cache: libdbus_to_json.do_not_disturb.Cache,
+    ):
+        libdbus_to_json.do_not_disturb.write_datetime_setting(
+            folder_path, setting_name, until, cache=cache
+        )
+        libdbus_to_json.do_not_disturb.cache_datetime_setting(
+            Path(folder_path), setting_name, cache=cache
+        )
+        self.update_icon()
+        self.setup_tray_menu()
 
     def refresh(self) -> None:
         self.update_icon()

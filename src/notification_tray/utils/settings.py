@@ -1,9 +1,13 @@
+import logging
 from datetime import datetime
 from pathlib import Path
 
 import libdbus_to_json.do_not_disturb
 
+from notification_tray.utils.logging import log_input_and_output
 
+
+@log_input_and_output(logging.DEBUG)
 def get_notification_backoff_minutes(
     root_path: Path, folder_path: Path, cache: dict[Path, int]
 ) -> int:
@@ -19,6 +23,7 @@ def get_notification_backoff_minutes(
     return 0
 
 
+@log_input_and_output(logging.DEBUG)
 def is_do_not_disturb_active(
     root_path: Path, folder_path: Path, cache: libdbus_to_json.do_not_disturb.Cache
 ) -> bool:
@@ -27,6 +32,7 @@ def is_do_not_disturb_active(
     )
 
 
+@log_input_and_output(logging.DEBUG)
 def get_do_not_disturb(
     root_path: Path, folder_path: Path, cache: libdbus_to_json.do_not_disturb.Cache
 ) -> datetime | None:
@@ -35,6 +41,7 @@ def get_do_not_disturb(
     )
 
 
+@log_input_and_output(logging.DEBUG)
 def is_hide_from_tray_active(
     root_path: Path, folder_path: Path, cache: libdbus_to_json.do_not_disturb.Cache
 ) -> bool:
