@@ -56,7 +56,9 @@ class Tray:
                 logger.debug(f"DnD or hide from tray is active. Skipping")
                 return 0
             else:
-                return len(dir_["notifications"]) + sum(
+                return sum(
+                    1 for n in dir_["notifications"].values() if not n.get("trashed")
+                ) + sum(
                     map(count_dir, dir_["folders"].values()),
                 )
 
@@ -122,7 +124,7 @@ class Tray:
                     self.root_path, dir_["path"], self.hide_from_tray
                 )
                 and (
-                    bool(dir_["notifications"])
+                    any(not n.get("trashed") for n in dir_["notifications"].values())
                     or (any(map(has_notifications, dir_["folders"].values())))
                 )
             )
@@ -140,11 +142,12 @@ class Tray:
                     lambda sub=submenu, f=folder: self.populate_submenu(sub, f)  # type: ignore
                 )
         for name, notification in notifications_cache["notifications"].items():
-            file_action = QAction(name, menu)
-            file_action.triggered.connect(
-                lambda checked, p=notification: self.notifier.notify(p, is_batch=True)  # type: ignore
-            )
-            menu.addAction(file_action)  # type: ignore
+            if not notification.get("trashed"):
+                file_action = QAction(name, menu)
+                file_action.triggered.connect(
+                    lambda checked, p=notification: self.notifier.notify(p, is_batch=True)  # type: ignore
+                )
+                menu.addAction(file_action)  # type: ignore
 
     def populate_submenu(self, submenu: QMenu, folder: NotificationFolder):
         path = folder["path"]

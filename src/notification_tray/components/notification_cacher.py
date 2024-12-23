@@ -6,13 +6,12 @@ from pathlib import Path
 from threading import Thread
 
 import libdbus_to_json.do_not_disturb
-from PyQt5.QtCore import QObject, pyqtSignal  # type: ignore
-from send2trash import send2trash as _send2trash
-
 from notification_tray.components.notifier import Notifier
 from notification_tray.types.notification import (CachedNotification,
                                                   NotificationFolder)
 from notification_tray.utils.logging import log_input_and_output
+from PyQt5.QtCore import QObject, pyqtSignal  # type: ignore
+from send2trash import send2trash as _send2trash
 
 send2trash = log_input_and_output(logging.INFO)(_send2trash)
 
@@ -104,6 +103,12 @@ class NotificationCacher(QObject):
 
     @log_input_and_output(logging.INFO)
     def trash(self, path: Path):
+        def mark_as_trashed(folder: NotificationFolder):
+            for notification in folder["notifications"].values():
+                notification["trashed"] = True
+            for subfolder in folder["folders"].values():
+                mark_as_trashed(subfolder)
+
         if path.exists():
             notifications = self.notification_cache
             for folder in path.relative_to(self.root_path).parent.parts:
@@ -111,13 +116,13 @@ class NotificationCacher(QObject):
             if path.is_file():
                 if path.suffix == ".json" and path.name != ".settings.json":
                     send2trash(path)
-                    del notifications["notifications"][path.name]
+                    notifications["notifications"][path.name]["trashed"] = True
             else:
                 if not list(path.rglob(".settings.json")) and not list(
                     path.rglob(".notification.wav")
                 ):
                     send2trash(path)
-                    del notifications["folders"][path.name]
+                    mark_as_trashed(notifications["folders"][path.name])
                 else:
                     notifications = notifications["folders"][path.name]
                     for folder in notifications["folders"].values():

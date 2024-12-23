@@ -129,19 +129,22 @@ class Notifier(QObject):
         all_notifications = [
             n
             for n in [notification, *notifications]
-            if n.get("hints", {}).get("urgency") == 2
-            or (
-                not is_do_not_disturb_active(
-                    self.root_path, n["path"].parent, self.do_not_disturb
-                )
-                and (
-                    is_batch
-                    or get_notification_backoff_minutes(
-                        self.root_path,
-                        n["path"].parent,
-                        self.notification_backoff_minutes,
+            if not n.get("trashed")
+            and (
+                n.get("hints", {}).get("urgency") == 2
+                or (
+                    not is_do_not_disturb_active(
+                        self.root_path, n["path"].parent, self.do_not_disturb
                     )
-                    == 0
+                    and (
+                        is_batch
+                        or get_notification_backoff_minutes(
+                            self.root_path,
+                            n["path"].parent,
+                            self.notification_backoff_minutes,
+                        )
+                        == 0
+                    )
                 )
             )
         ]
