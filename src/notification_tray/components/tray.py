@@ -13,7 +13,8 @@ from notification_tray.components.notification_cacher import NotificationCacher
 from notification_tray.components.notifier import Notifier
 from notification_tray.types.notification import NotificationFolder
 from notification_tray.utils.logging import log_input_and_output
-from notification_tray.utils.settings import (is_do_not_disturb_active,
+from notification_tray.utils.settings import (get_notification_backoff_minutes,
+                                              is_do_not_disturb_active,
                                               is_hide_from_tray_active)
 
 from ..types.notification import CachedNotification
@@ -56,8 +57,18 @@ class Tray:
                 logger.debug(f"DnD or hide from tray is active. Skipping")
                 return 0
             else:
+                notification_backoff_minutes = get_notification_backoff_minutes(
+                    self.root_path, dir_["path"], self.notification_backoff_minutes
+                )
                 return sum(
-                    1 for n in dir_["notifications"].values() if not n.get("trashed")
+                    1
+                    for n in dir_["notifications"].values()
+                    if not n.get("trashed")
+                    and (
+                        notification_backoff_minutes <= 0
+                        or (datetime.now(UTC) - n["at"]).total_seconds() // 60
+                        > notification_backoff_minutes
+                    )
                 ) + sum(
                     map(count_dir, dir_["folders"].values()),
                 )
