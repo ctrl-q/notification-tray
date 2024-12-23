@@ -106,6 +106,7 @@ class NotificationWidget(QWidget):
         summary_layout = QVBoxLayout()
         summary_label = QLabel(self.data["summary"] + "\n" + self.data["body"], self)
         summary_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        summary_label.setWordWrap(True)
         summary_layout.addWidget(summary_label)
         layout.addLayout(summary_layout)
 
