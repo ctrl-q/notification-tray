@@ -49,6 +49,17 @@ class NotificationService(dbus.service.Object):
 
     @log_input_and_output(logging.INFO)
     @dbus.decorators.signal(  # type: ignore
+        dbus_interface="org.freedesktop.Notifications", signature="sss"
+    )
+    def NotificationDisplayed(
+        self,
+        app_name: str,
+        summary: str,
+        body: str,
+    ): ...
+
+    @log_input_and_output(logging.INFO)
+    @dbus.decorators.signal(  # type: ignore
         dbus_interface="org.freedesktop.Notifications", signature="uu"
     )
     def NotificationClosed(self, id: int, reason: NotificationCloseReason):

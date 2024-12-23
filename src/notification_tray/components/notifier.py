@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 class Notifier(QObject):
     action_invoked = pyqtSignal(int, str)
+    notification_displayed = pyqtSignal(str, str, str)
     notification_closed = pyqtSignal(int, int, str, bool)
     notification_sounds: set[Path] = set()
     last_notified: dict[Path, int] = {}
@@ -78,6 +79,13 @@ class Notifier(QObject):
                 )
                 self.offset += notification_widget.height() + 10
                 notification_widget.show()
+                notification_widget.displayed.connect(
+                    lambda: self.notification_displayed.emit(
+                        notification_widget.data["app_name"],
+                        notification_widget.data["summary"],
+                        notification_widget.data["body"],
+                    )
+                )
                 notification_widget.displayed.emit()
             else:
                 logger.debug(

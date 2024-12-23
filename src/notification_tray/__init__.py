@@ -84,6 +84,9 @@ class SystemTrayFileBrowser(QApplication):
                 self.notifier.notify,
             )
         )
+        self.notifier.notification_displayed.connect(
+            self.notification_service.NotificationDisplayed
+        )
         self.notifier.notification_closed.connect(self.close_if_in_this_run)
         self.notifier.notification_closed.connect(self.trash_if_closed)
         self.notifier.action_invoked.connect(self.notification_service.ActionInvoked)
