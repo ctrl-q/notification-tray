@@ -111,8 +111,6 @@ class Notifier(QObject):
             and not is_batch
             and notification_widget.data["id"] >= 0,
         )
-        if notification_widget in self.notification_widgets:
-            self.notification_widgets.remove(notification_widget)
         self.offset = sum(
             widget.height() + 10
             for widget in self.notification_widgets
@@ -120,7 +118,8 @@ class Notifier(QObject):
         )
         logger.info("Displaying queued notifications")
         for notification_widget in self.notification_widgets:
-            self.show_or_queue_notification(notification_widget)
+            if not notification_widget.was_displayed:
+                self.show_or_queue_notification(notification_widget)
 
     def notify(
         self,

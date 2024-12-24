@@ -20,7 +20,12 @@ class NotificationWidget(QWidget):
     def __init__(self, data: CachedNotification):
         super().__init__()
         self.data = data
+        self.was_displayed = False
+        self.displayed.connect(self._set_was_displayed)
         self.initUI()
+
+    def _set_was_displayed(self):
+        self.was_displayed = True
 
     def _get_icon(self) -> QIcon | None:
         if image_data := (
