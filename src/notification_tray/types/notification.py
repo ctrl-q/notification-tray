@@ -34,7 +34,7 @@ class Notification(TypedDict):
     app_icon: str
     summary: str
     body: str
-    actions: list[tuple[str, str]]
+    actions: dict[str, str]
     hints: NotificationHints
     expire_timeout: int
     id: int

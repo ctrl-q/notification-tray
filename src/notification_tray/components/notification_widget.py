@@ -118,7 +118,7 @@ class NotificationWidget(QWidget):
         button_layout = QHBoxLayout()
 
         logger.debug("Adding action buttons")
-        for key, value in zip(*[iter(self.data["actions"])] * 2):
+        for key, value in self.data["actions"].items():
             button = QPushButton(None, self)
             if self.data.get("hints", {}).get("action-icons"):
                 button.setIcon(QIcon.fromTheme(value))

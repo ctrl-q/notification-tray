@@ -77,7 +77,7 @@ class NotificationService(dbus.service.Object):
         app_icon: str,
         summary: str,
         body: str,
-        actions: list[tuple[str, str]],
+        actions: list[str],
         hints: NotificationHints,
         expire_timeout: int,
     ):
@@ -93,7 +93,7 @@ class NotificationService(dbus.service.Object):
             body=body,
             expire_timeout=expire_timeout,
             id=id,
-            actions=actions,
+            actions=dict(zip(actions[::2], actions[1::2])),
             hints=hints,
             at=datetime.now(UTC),
         )

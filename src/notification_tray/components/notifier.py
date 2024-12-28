@@ -253,7 +253,7 @@ class Notifier(QObject):
                         app_icon="error",
                         at=datetime.now(UTC),
                         hints={"sound-name": "dialog-error"},
-                        actions=[],
+                        actions={},
                         app_name="notification-tray",
                         expire_timeout=-1,
                         id=-1,
