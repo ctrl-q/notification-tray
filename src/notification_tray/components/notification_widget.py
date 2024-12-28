@@ -1,8 +1,7 @@
-# TODO (med) Make the notification clickable, and on click, trigger the action with key "default"
 import logging
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QIcon, QImage, QPixmap
+from PyQt5.QtGui import QIcon, QImage, QMouseEvent, QPixmap
 from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
                              QWidget)
 
@@ -20,9 +19,27 @@ class NotificationWidget(QWidget):
     def __init__(self, data: CachedNotification):
         super().__init__()
         self.data = data
+        self.action_invoked.connect(
+            lambda: (
+                self.closed.emit(NotificationCloseReason.DISMISSED_BY_USER)
+                if not self.data.get("resident")
+                else None
+            )
+        )
         self.was_displayed = False
         self.displayed.connect(self._set_was_displayed)
         self.initUI()
+
+    def mousePressEvent(self, a0: QMouseEvent | None) -> None:
+        actions = self.data["actions"]
+        default_action = (
+            next(iter(actions))
+            if len(actions) == 1
+            else "default" if "default" in actions else None
+        )
+        if default_action:
+            self.action_invoked.emit(default_action)
+        return super().mousePressEvent(a0)
 
     def _set_was_displayed(self):
         self.was_displayed = True
@@ -125,12 +142,6 @@ class NotificationWidget(QWidget):
             else:
                 button.setText(value)
             button.clicked.connect(lambda: self.action_invoked.emit(key))
-            if not self.data.get("resident"):
-                button.clicked.connect(
-                    lambda: self.closed.emit(
-                        NotificationCloseReason.DISMISSED_BY_USER.value
-                    )
-                )
             logger.debug(f"Adding action button {key} => {value}")
             button_layout.addWidget(button)
 
