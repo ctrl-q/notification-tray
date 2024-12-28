@@ -76,7 +76,7 @@ class NotificationCacher(QObject):
 
     def cache(self, notification: CachedNotification):
         notifications = self.notification_cache
-        if not notification.get("hints", {}).get("transient"):
+        if not notification["hints"].get("transient"):
             notification["path"].parent.mkdir(parents=True, exist_ok=True)
             notification_to_dump = dict(notification.copy())
             del notification_to_dump["at"]

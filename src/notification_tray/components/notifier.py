@@ -60,8 +60,8 @@ class Notifier(QObject):
             case QScreen():
                 screen = screen.availableGeometry()
 
-        if (x := notification_widget.data.get("hints", {}).get("x")) is not None and (
-            y := notification_widget.data.get("hints", {}).get("y")
+        if (x := notification_widget.data["hints"].get("x")) is not None and (
+            y := notification_widget.data["hints"].get("y")
         ) is not None:
             logger.debug(
                 f"Notification {notification_widget.data['id']} has x,y hints ({x},{y}). Moving there"
@@ -155,7 +155,7 @@ class Notifier(QObject):
             for n in [notification, *notifications]
             if not n.get("trashed")
             and (
-                n.get("hints", {}).get("urgency") == 2
+                n["hints"].get("urgency") == 2
                 or (
                     not is_do_not_disturb_active(
                         self.root_path, n["path"].parent, self.do_not_disturb
@@ -317,12 +317,12 @@ class Notifier(QObject):
             )
         else:
             audio_path: str | None = None
-            if sound_file := notification.get("hints", {}).get("sound-file"):
+            if sound_file := notification["hints"].get("sound-file"):
                 audio_path = sound_file
                 logger.debug(
                     f"Getting sound for {notification['id']} from sound-file hint"
                 )
-            elif sound_name := notification.get("hints", {}).get("sound-name"):
+            elif sound_name := notification["hints"].get("sound-name"):
                 audio_path = f"/usr/share/sounds/freedesktop/{sound_name}.oga"
                 logger.debug(
                     f"Getting sound for {notification['id']} from sound-name hint"

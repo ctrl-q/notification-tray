@@ -46,9 +46,9 @@ class NotificationWidget(QWidget):
 
     def _get_icon(self) -> QIcon | None:
         if image_data := (
-            self.data.get("hints", {}).get("image-data")
-            or self.data.get("hints", {}).get("image_data")
-            or self.data.get("hints", {}).get("icon_data")
+            self.data["hints"].get("image-data")
+            or self.data["hints"].get("image_data")
+            or self.data["hints"].get("icon_data")
         ):
             logger.debug("Getting notification icon from hints")
             width, height, rowstride, has_alpha, bits_per_sample, channels, data = (
@@ -73,8 +73,8 @@ class NotificationWidget(QWidget):
             )
 
         elif label := (
-            self.data.get("hints", {}).get("image-path")
-            or self.data.get("hints", {}).get("image_path")
+            self.data["hints"].get("image-path")
+            or self.data["hints"].get("image_path")
             or self.data["app_icon"]
         ):
             if label.startswith("file://"):
@@ -137,7 +137,7 @@ class NotificationWidget(QWidget):
         logger.debug("Adding action buttons")
         for key, value in self.data["actions"].items():
             button = QPushButton(None, self)
-            if self.data.get("hints", {}).get("action-icons"):
+            if self.data["hints"].get("action-icons"):
                 button.setIcon(QIcon.fromTheme(value))
             else:
                 button.setText(value)
@@ -149,10 +149,7 @@ class NotificationWidget(QWidget):
         self.setLayout(layout)
         self.adjustSize()
 
-        if (
-            self.data["expire_timeout"]
-            and self.data.get("hints", {}).get("urgency") != 2
-        ):
+        if self.data["expire_timeout"] and self.data["hints"].get("urgency") != 2:
             self.displayed.connect(self.schedule_close)
 
     def schedule_close(self):
