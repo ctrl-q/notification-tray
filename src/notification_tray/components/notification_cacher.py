@@ -6,12 +6,13 @@ from pathlib import Path
 from threading import Thread
 
 import libdbus_to_json.do_not_disturb
+from PyQt5.QtCore import QObject, pyqtSignal  # type: ignore
+from send2trash import send2trash as _send2trash
+
 from notification_tray.components.notifier import Notifier
 from notification_tray.types.notification import (CachedNotification,
                                                   NotificationFolder)
 from notification_tray.utils.logging import log_input_and_output
-from PyQt5.QtCore import QObject, pyqtSignal  # type: ignore
-from send2trash import send2trash as _send2trash
 
 send2trash = log_input_and_output(logging.INFO)(_send2trash)
 
