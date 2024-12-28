@@ -29,7 +29,7 @@ class Notifier(QObject):
     notification_sounds: set[Path] = set()
     last_notified: dict[Path, int] = {}
     started_at = datetime.now(UTC)
-    notification_widgets = set[NotificationWidget]()
+    notification_widgets = dict[int, NotificationWidget]()
     offset = 0
 
     def __init__(
@@ -52,7 +52,7 @@ class Notifier(QObject):
         logger.info(
             f"Got request to show notification {notification_widget.data['id']}"
         )
-        self.notification_widgets.add(notification_widget)
+        self.notification_widgets[notification_widget.data["id"]] = notification_widget
         screen = QApplication.primaryScreen()
         match screen:
             case None:
@@ -94,30 +94,47 @@ class Notifier(QObject):
 
     def close_notification(
         self,
-        notification_widget: NotificationWidget,
+        notification_id_or_widget: int | NotificationWidget,
         reason: int,
         is_batch: bool = False,
     ):
+        reason = NotificationCloseReason(reason)
+        match notification_id_or_widget:
+            case NotificationWidget():
+                notification_widget = notification_id_or_widget
+            case int():
+                notification_widget = self.notification_widgets.get(
+                    notification_id_or_widget
+                )
+                if notification_widget is None:
+                    logger.error(
+                        f"Could not find notification with id {notification_id_or_widget}. Skipping"
+                    )
+                    return
+
         logger.info(
-            f"Closing notification {notification_widget.data['id']}. Reason {NotificationCloseReason(reason).name}"
+            f"Closing notification {notification_widget.data['id']}. Reason {reason.name}"
         )
         if notification_widget.isVisible():
             notification_widget.close()
-        self.notification_closed.emit(
-            notification_widget.data["id"],
-            reason,
-            str(notification_widget.data["path"]),
-            notification_widget.data["at"] >= self.started_at
-            and not is_batch
-            and notification_widget.data["id"] >= 0,
-        )
+        if (
+            reason != NotificationCloseReason.CLOSED_BY_CALL_TO_CLOSENOTIFICATION
+        ):  # signal already emitted by NotificationService, no need to re-emit
+            self.notification_closed.emit(
+                notification_widget.data["id"],
+                reason.value,
+                str(notification_widget.data["path"]),
+                notification_widget.data["at"] >= self.started_at
+                and not is_batch
+                and notification_widget.data["id"] >= 0,
+            )
         self.offset = sum(
             widget.height() + 10
-            for widget in self.notification_widgets
+            for widget in self.notification_widgets.values()
             if widget.isVisible()
         )
         logger.info("Displaying queued notifications")
-        for notification_widget in self.notification_widgets:
+        for notification_widget in self.notification_widgets.values():
             if not notification_widget.was_displayed:
                 self.show_or_queue_notification(notification_widget)
 
@@ -287,10 +304,6 @@ class Notifier(QObject):
                     logger.debug("Skipping notification due to DnD or backoff settings")
 
             if new_notifications:
-                # Hack: set expire_timeout to 0 so that self.notify uses that as the timeout for all notifications
-                new_notifications[0] = CachedNotification(
-                    new_notifications[0].copy(), expire_timeout=0
-                )
                 self.notify(*new_notifications, is_batch=True)
             for folder in folder["folders"].values():
                 process(folder)

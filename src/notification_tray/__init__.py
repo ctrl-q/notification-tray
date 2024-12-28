@@ -84,6 +84,12 @@ class SystemTrayFileBrowser(QApplication):
                 self.notifier.notify,
             )
         )
+        self.notification_service.signaler.notification_closed.connect(
+            self.close_notification_from_dbus_call
+        )
+        self.notification_service.signaler.notification_closed.connect(
+            self.trash_from_dbus_call
+        )
         self.notifier.notification_displayed.connect(
             self.notification_service.NotificationDisplayed
         )
@@ -109,6 +115,16 @@ class SystemTrayFileBrowser(QApplication):
             )
         )
         self.application_started.emit()
+
+    def close_notification_from_dbus_call(
+        self, id: int, reason: NotificationCloseReason
+    ):
+        self.notifier.close_notification(id, reason, is_batch=False)
+
+    def trash_from_dbus_call(self, id: int, reason: NotificationCloseReason):
+        self.trash_if_closed(
+            None, reason, str(self.notification_service.notifications[id]["path"]), None
+        )
 
     def start_timer(self):
         self.timer = QTimer()

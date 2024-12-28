@@ -111,12 +111,13 @@ class NotificationService(dbus.service.Object):
         out_signature="",
     )
     def CloseNotification(self, id: int):
-        # TODO the spec says  The NotificationClosed signal is emitted by this method. See if it's automatic or if I need to do it
-        # TODO If the notification no longer exists, an empty D-BUS Error message is sent back.
-        # TODO nothing connects to this signal currently
-        self.signaler.notification_closed.emit(
-            id, NotificationCloseReason.CLOSED_BY_CALL_TO_CLOSENOTIFICATION.value
-        )
+        if id in self.notifications and not self.notifications[id].get("trashed"):
+            reason = NotificationCloseReason.CLOSED_BY_CALL_TO_CLOSENOTIFICATION
+            self.NotificationClosed(id, reason)
+            self.signaler.notification_closed.emit(id, reason)
+
+        else:
+            raise dbus.exceptions.DBusException()
 
     @dbus.decorators.method("org.freedesktop.Notifications", out_signature="ssss")  # type: ignore
     def GetServerInformation(self) -> tuple[str, str, str, str]:
