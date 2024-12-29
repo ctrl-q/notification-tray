@@ -4,7 +4,6 @@ from typing import Literal, TypedDict
 
 from typing_extensions import NotRequired
 
-# TODO (med) switch to pydantic
 NotificationHints = TypedDict(
     "NotificationHints",
     {

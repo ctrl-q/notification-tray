@@ -89,7 +89,6 @@ class NotificationWidget(QWidget):
     def initUI(self):
         logger.info("Creating notification widget")
         self.setFixedWidth(256)
-        # TODO (high) error handling
         self.setWindowFlags(
             Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.FramelessWindowHint
@@ -101,7 +100,11 @@ class NotificationWidget(QWidget):
         top_layout = QHBoxLayout()
 
         logger.debug("Getting icon")
-        icon = self._get_icon()
+        try:
+            icon = self._get_icon()
+        except Exception as e:
+            logger.error(f"Could not get icon: {e}")
+            icon = None
         if icon:
             logger.debug("Got icon")
             icon_label = QLabel(self)
@@ -112,7 +115,9 @@ class NotificationWidget(QWidget):
             logger.debug("No icon")
 
         app_name_label = QLabel(self.data["app_name"], self)
-        app_name_label.setObjectName("appLabel")
+        app_name_label.setObjectName(
+            "appLabel"
+        )  # for compatibility with lxqt-notificationd themes
         top_layout.addWidget(app_name_label)
 
         close_button = QPushButton()

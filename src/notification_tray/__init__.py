@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
-# TODO use https://git.nullroute.lt/hacks/dzenify.git/tree/dzenify for reference
 class SystemTrayFileBrowser(QApplication):
     application_started = pyqtSignal()
 
