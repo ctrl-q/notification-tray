@@ -1,5 +1,6 @@
 # TODO (low) stop using libdbus-to-json
 # TODO (med) use watchdog for file and setting monitoring
+import configparser
 import json
 import logging
 import os
@@ -44,16 +45,8 @@ class SystemTrayFileBrowser(QApplication):
         self.root_path = root_path
         self.refresh_settings()
         self.notification_service = NotificationService(self.root_path)
+        self.try_set_lxqt_themes()
 
-        QIcon.setThemeName("Papirus-Dark")  # TODO load the LXQt theme
-        # # TODO load the LXQt theme
-        with open("/usr/share/lxqt/themes/less/lxqt-notificationd.qss") as f:
-            self.setStyleSheet(
-                f.read()
-                .replace("url(./", "url(")
-                .replace("url(", "url(/usr/share/lxqt/themes/less/")
-                .replace("Notification", "NotificationWidget")
-            )
         self.notification_cache = NotificationFolder(
             folders={}, notifications={}, path=root_path
         )
@@ -115,6 +108,58 @@ class SystemTrayFileBrowser(QApplication):
             )
         )
         self.application_started.emit()
+
+    def try_set_lxqt_themes(self) -> None:
+        lxqt_path_priority = [
+            Path().home() / ".config" / "lxqt",
+            Path(Path().absolute().root) / "usr" / "share" / "lxqt",
+        ]
+        lxqt_config_files = [
+            lxqt_path / "lxqt.conf" for lxqt_path in lxqt_path_priority
+        ]
+
+        logger.info(
+            f"Trying to find LXQt theme in {', '.join(map(str, lxqt_config_files))}"
+        )
+        config = configparser.ConfigParser()
+        config.read(reversed(lxqt_config_files))
+
+        theme = config.get("General", "theme", fallback=None)
+        if theme:
+            logger.info(f"Found theme {theme}")
+            try:
+                notification_theme_paths = list(
+                    filter(
+                        Path.exists,
+                        (
+                            path / "themes" / theme / "lxqt-notificationd.qss"
+                            for path in lxqt_path_priority
+                        ),
+                    )
+                )
+                if notification_theme_paths:
+                    notification_theme_path, *_ = notification_theme_paths
+                    self.setStyleSheet(
+                        notification_theme_path.read_text()
+                        .replace("url(./", "url(")
+                        .replace("url(", f"url({notification_theme_path.parent}/")
+                        .replace("Notification", "NotificationWidget")
+                    )
+            except Exception as e:
+                logger.error(f"Could not set theme: {e}")
+        else:
+            logger.info("No LXQt theme found")
+
+        icon_theme = config.get("General", "icon_theme", fallback=None)
+        if icon_theme:
+            logger.info(f"Found icon theme {icon_theme}")
+            try:
+                QIcon.setThemeName(icon_theme)
+                logger.info(f"Icon theme set to {icon_theme}")
+            except Exception as e:
+                logger.error(f"Could not set icon theme: {e}")
+        else:
+            logger.info("No LXQt icon theme found")
 
     def close_notification_from_dbus_call(
         self, id: int, reason: NotificationCloseReason

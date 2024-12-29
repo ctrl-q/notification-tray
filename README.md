@@ -31,3 +31,27 @@ If you receives multiple notifications in quick succession, and would like to re
 ### Custom notification sounds
 
 Place a .notification.wav file under any folder to set it as the notification sound for that folder
+
+### Theming
+
+notification-tray reads your theming config from your LXQt configuration file, either `.config/lxqt/lxqt.conf` or `/usr/share/lxqt/lxqt.conf`
+
+#### Icon theme
+
+To set your [icon theme](https://specifications.freedesktop.org/icon-theme-spec), set the following config in your configuration file:
+
+```ini
+[General]
+icon_theme=<your_icon_theme_name>
+```
+
+#### Notification theme
+
+notification-tray is compatible with [LXQt-notificationd themes](https://github.com/lxqt/lxqt/wiki/Creating-LXQt-Themes#the-lxqt-notification-daemon-pathlxqt-notificationd).
+
+To set your notification theme, set the following config in your configuration file:
+
+```ini
+[General]
+theme=<your_theme_name>
+```
