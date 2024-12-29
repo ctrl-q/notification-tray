@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
-import libdbus_to_json.do_not_disturb
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import QAction, QApplication, QMenu, QSystemTrayIcon
@@ -12,6 +11,7 @@ from PyQt5.QtWidgets import QAction, QApplication, QMenu, QSystemTrayIcon
 from notification_tray.components.notification_cacher import NotificationCacher
 from notification_tray.components.notifier import Notifier
 from notification_tray.types.notification import NotificationFolder
+from notification_tray.utils import settings
 from notification_tray.utils.logging import log_input_and_output
 from notification_tray.utils.settings import (get_notification_backoff_minutes,
                                               is_do_not_disturb_active,
@@ -26,8 +26,8 @@ class Tray:
     def __init__(
         self,
         root_path: Path,
-        do_not_disturb: libdbus_to_json.do_not_disturb.Cache,
-        hide_from_tray: libdbus_to_json.do_not_disturb.Cache,
+        do_not_disturb: settings.Cache,
+        hide_from_tray: settings.Cache,
         notification_backoff_minutes: dict[Path, int],
         notifier: Notifier,
         notification_cacher: NotificationCacher,
@@ -257,14 +257,10 @@ class Tray:
         setting_name: str,
         folder_path: str,
         until: datetime,
-        cache: libdbus_to_json.do_not_disturb.Cache,
+        cache: settings.Cache,
     ):
-        libdbus_to_json.do_not_disturb.write_datetime_setting(
-            folder_path, setting_name, until, cache=cache
-        )
-        libdbus_to_json.do_not_disturb.cache_datetime_setting(
-            Path(folder_path), setting_name, cache=cache
-        )
+        settings.write_datetime_setting(folder_path, setting_name, until, cache=cache)
+        settings.cache_datetime_setting(Path(folder_path), setting_name, cache=cache)
         self.update_icon()
         self.setup_tray_menu()
 

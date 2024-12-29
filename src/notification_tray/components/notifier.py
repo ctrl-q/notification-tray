@@ -3,8 +3,6 @@ from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 
-import libdbus_to_json
-import libdbus_to_json.do_not_disturb
 from PyQt5.QtCore import QObject, QUrl, pyqtSignal
 from PyQt5.QtGui import QScreen
 from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
@@ -15,6 +13,7 @@ from notification_tray.components.notification_service import \
 from notification_tray.components.notification_widget import NotificationWidget
 from notification_tray.types.notification import (CachedNotification,
                                                   NotificationFolder)
+from notification_tray.utils import settings
 from notification_tray.utils.settings import (get_do_not_disturb,
                                               get_notification_backoff_minutes,
                                               is_do_not_disturb_active)
@@ -35,7 +34,7 @@ class Notifier(QObject):
     def __init__(
         self,
         root_path: Path,
-        do_not_disturb: libdbus_to_json.do_not_disturb.Cache,
+        do_not_disturb: settings.Cache,
         notification_backoff_minutes: dict[Path, int],
         notification_cache: NotificationFolder,
         parent: QObject | None = None,

@@ -1,4 +1,3 @@
-# TODO (low) stop using libdbus-to-json
 # TODO (med) use watchdog for file and setting monitoring
 import configparser
 import json
@@ -10,7 +9,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-import libdbus_to_json.do_not_disturb
 from dbus.mainloop.glib import DBusGMainLoop  # type: ignore
 from PyQt5.QtCore import QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon
@@ -22,6 +20,7 @@ from notification_tray.components.notification_service import (
 from notification_tray.components.notifier import Notifier
 from notification_tray.components.tray import Tray
 from notification_tray.types.notification import NotificationFolder
+from notification_tray.utils import settings
 from notification_tray.utils.fp import compose
 
 logging.basicConfig(
@@ -181,8 +180,8 @@ class SystemTrayFileBrowser(QApplication):
     def refresh_settings(
         self,
     ) -> None:
-        do_not_disturb = libdbus_to_json.do_not_disturb.Cache()
-        hide_from_tray = libdbus_to_json.do_not_disturb.Cache()
+        do_not_disturb = settings.Cache()
+        hide_from_tray = settings.Cache()
         notification_backoff_minutes = dict[Path, int]()
         for settings_file in Path(self.root_path).rglob(".settings.json"):
             try:
@@ -190,7 +189,7 @@ class SystemTrayFileBrowser(QApplication):
                     ("do_not_disturb_until", do_not_disturb),
                     ("hide_from_tray_until", hide_from_tray),
                 ]:
-                    libdbus_to_json.do_not_disturb.cache_datetime_setting(
+                    settings.cache_datetime_setting(
                         settings_file.parent, setting_name, cache=cache
                     )
                 if (

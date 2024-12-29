@@ -1,5 +1,4 @@
 dbus-python==1.3.2
-libdbus-to-json @ git+https://github.com/ctrl-q/libdbus-to-json.git@23a0a65e2a5fcfac9ba20f74f7152f4b98c2d51b
 pygobject==3.50.0
 pyqt5==5.15.11
 send2trash==1.8.3
