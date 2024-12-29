@@ -32,6 +32,10 @@ If you receives multiple notifications in quick succession, and would like to re
 
 Place a .notification.wav file under any folder to set it as the notification sound for that folder
 
+### Notification timeout
+
+To change the default notification timeout, set the environment variable `NOTIFICATION_TRAY_DEFAULT_TIMEOUT_MILLIS` to a nonzero positive integer
+
 ### Theming
 
 notification-tray reads your theming config from your LXQt configuration file, either `.config/lxqt/lxqt.conf` or `/usr/share/lxqt/lxqt.conf`

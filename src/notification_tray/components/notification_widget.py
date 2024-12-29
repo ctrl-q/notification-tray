@@ -10,6 +10,16 @@ from .notification_service import NotificationCloseReason
 
 logger = logging.getLogger(__name__)
 
+import os
+
+default_timeout = 5000
+try:
+    default_timeout = (
+        max(0, int(os.environ["NOTIFICATION_TRAY_DEFAULT_TIMEOUT_MILLIS"])) or 5000
+    )
+except:
+    pass
+
 
 class NotificationWidget(QWidget):
     action_invoked = pyqtSignal(str)
@@ -159,7 +169,7 @@ class NotificationWidget(QWidget):
 
     def schedule_close(self):
         timeout = (
-            5000  # TODO (low) make this a config
+            default_timeout
             if self.data["expire_timeout"] == -1
             else self.data["expire_timeout"]
         )
