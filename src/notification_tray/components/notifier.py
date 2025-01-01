@@ -3,9 +3,9 @@ from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 
-from PyQt5.QtCore import QObject, QUrl, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QScreen
-from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
+from PyQt5.QtMultimedia import QSound
 from PyQt5.QtWidgets import QApplication
 
 from notification_tray.components.notification_service import \
@@ -25,7 +25,6 @@ class Notifier(QObject):
     action_invoked = pyqtSignal(int, str)
     notification_displayed = pyqtSignal(int, str, str, str)
     notification_closed = pyqtSignal(int, int, str, bool)
-    notification_sounds: set[Path] = set()
     last_notified: dict[Path, int] = {}
     started_at = datetime.now(UTC)
     notification_widgets = dict[int, NotificationWidget]()
@@ -335,19 +334,16 @@ class Notifier(QObject):
                         notification["path"].parent.relative_to(self.root_path).parents,
                     ),
                 ]:
-                    if (
-                        notification_sound := (folder / ".notification.wav")
-                    ) in self.notification_sounds:
+                    logger.debug(f"Checking {folder}")
+                    if (notification_sound := (folder / ".notification.wav")).exists():
                         audio_path = str(notification_sound)
                         logger.debug(
-                            f"Getting sound for {notification['id']} from .notification.wav hint"
+                            f"Getting sound for {notification['id']} from .notification.wav file"
                         )
                         break
             if audio_path:
                 logger.debug(f"Notification sound: {audio_path}")
-                player = QMediaPlayer()
-                player.setMedia(QMediaContent(QUrl.fromLocalFile(audio_path)))
-                player.play()
+                QSound.play(audio_path)
             else:
                 logger.debug(
                     f"No notification sound found for notification {notification['id']}"
