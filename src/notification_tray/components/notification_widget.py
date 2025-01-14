@@ -1,6 +1,6 @@
 import logging
 
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtCore import QEvent, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon, QImage, QMouseEvent, QPixmap
 from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
                              QWidget)
@@ -32,6 +32,12 @@ class NotificationWidget(QWidget):
         self.was_displayed = False
         self.displayed.connect(self._set_was_displayed)
         self.initUI()
+        self.timer = QTimer(self)
+        self.timer_remaining_time = -1
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(
+            lambda: self.closed.emit(NotificationCloseReason.EXPIRED.value)
+        )
 
     def mousePressEvent(self, a0: QMouseEvent | None) -> None:
         actions = self.data["actions"]
@@ -43,6 +49,15 @@ class NotificationWidget(QWidget):
         if default_action:
             self.action_invoked.emit(default_action)
         return super().mousePressEvent(a0)
+
+    def enterEvent(self, a0: QEvent | None) -> None:
+        self.timer_remaining_time = self.timer.remainingTime()
+        self.timer.stop()
+        return super().enterEvent(a0)
+
+    def leaveEvent(self, a0: QEvent | None) -> None:
+        self.timer.start(self.timer_remaining_time)
+        return super().leaveEvent(a0)
 
     def _set_was_displayed(self):
         self.was_displayed = True
@@ -169,7 +184,4 @@ class NotificationWidget(QWidget):
         logger.info(
             f"Scheduling close of notification {self.data['id']} in {timeout / 1000} seconds"
         )
-        QTimer.singleShot(
-            timeout,
-            lambda: self.closed.emit(NotificationCloseReason.EXPIRED.value),
-        )
+        self.timer.start(timeout)
