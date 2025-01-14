@@ -29,13 +29,6 @@ class NotificationWidget(QWidget):
     def __init__(self, data: CachedNotification):
         super().__init__()
         self.data = data
-        self.action_invoked.connect(
-            lambda: (
-                self.closed.emit(NotificationCloseReason.DISMISSED_BY_USER)
-                if not self.data.get("resident")
-                else None
-            )
-        )
         self.was_displayed = False
         self.displayed.connect(self._set_was_displayed)
         self.initUI()

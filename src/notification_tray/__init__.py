@@ -86,7 +86,14 @@ class SystemTrayFileBrowser(QApplication):
         )
         self.notifier.notification_closed.connect(self.close_if_in_this_run)
         self.notifier.notification_closed.connect(self.trash_if_closed)
-        self.notifier.action_invoked.connect(self.notification_service.ActionInvoked)
+        self.notifier.action_invoked.connect(
+            lambda id, key: [
+                self.notification_service.ActionInvoked(id, key),
+                self.notifier.close_notification(
+                    id, NotificationCloseReason.DISMISSED_BY_USER
+                ),
+            ]
+        )
 
         self.tray = Tray(
             app=self,
