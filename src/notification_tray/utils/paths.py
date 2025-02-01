@@ -36,17 +36,32 @@ def get_output_path(root_path: Path, notification: Notification) -> Path:
                         "subdir_callback"
                     )
                 ):
-                    subdir = eval(subdir_callback)(notification.copy())
-                    if subdir:
-                        if (
-                            folder.resolve()
-                            in (
-                                outdir := (folder / slugify(str(subdir))).resolve()
-                            ).parents
-                        ):
-                            return outdir
-                        else:
-                            print(f"Error: Subdir must be below {folder}, got {outdir}")
+                    subdir_path = eval(subdir_callback)(notification.copy())
+                    match subdir_path:
+                        case [] | None:
+                            pass
+                        case [*strings] if all(isinstance(s, str) for s in strings):
+                            if subdir_path:
+                                if (
+                                    folder.resolve()
+                                    in (
+                                        outdir := (
+                                            folder.joinpath(
+                                                *map(slugify, map(str, strings))
+                                            )
+                                        ).resolve()
+                                    ).parents
+                                ):
+                                    return outdir
+                                else:
+                                    print(
+                                        f"Error: Subdir must be below {folder}, got {outdir}"
+                                    )
+                                    return default_outdir
+                        case _:
+                            print(
+                                f"Error: Expected list of strings from subdir_callback. Got {type(subdir_path)}"
+                            )
                             return default_outdir
         except Exception as e:
             print("Error:", e, file=sys.stderr)

@@ -61,8 +61,8 @@ To change this, set `subdir_callback` in a .settings.json in any folder in that 
 
 ```json5
 {
-    // (optional) lambda expression taking a notification dict as input, and returning a string or None
-    // If the return value is None or "", the default outdir is used instead
+    // (optional) lambda expression taking a notification dict as input, and returning either a list of strings representing the relative path, or None
+    // If the return value is None or contains no non-empty strings, the default outdir is used instead
     "subdir_callback": "lambda notification: 'some subdirectory'"
 }
 ```
