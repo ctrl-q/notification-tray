@@ -9,6 +9,9 @@ from pathlib import Path
 from notification_tray.types.notification import Notification
 from notification_tray.utils.logging import log_input_and_output
 
+MAX_FILENAME_LENGTH = 255  # `get_conf NAME_MAX .`
+MAX_FILEPATH_LENGTH = 4096  # `get_conf PATH_MAX .`
+
 
 @log_input_and_output(logging.DEBUG)
 def get_output_path(root_path: Path, notification: Notification) -> Path:
@@ -67,4 +70,9 @@ def get_output_path(root_path: Path, notification: Notification) -> Path:
             print("Error:", e, file=sys.stderr)
         return default_outdir
 
-    return get_outdir() / f"{time.strftime('%Y%m%d-%H%M%S')}-{notification['id']}.json"
+    dir_ = get_outdir()
+    suffix = ".json"
+    name = f"{time.strftime('%Y%m%d-%H%M%S')}-{notification['id']}"
+    name = name[: MAX_FILENAME_LENGTH - len(suffix)]
+    output_path = str(dir_ / name)[: MAX_FILEPATH_LENGTH - len(suffix)] + suffix
+    return Path(output_path)
