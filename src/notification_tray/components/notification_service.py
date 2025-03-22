@@ -6,9 +6,10 @@ from pathlib import Path
 import dbus
 import dbus.decorators
 import dbus.service
+from PyQt5.QtCore import QObject, pyqtSignal
+
 from notification_tray.utils.logging import log_input_and_output
 from notification_tray.utils.paths import get_output_path
-from PyQt5.QtCore import QObject, pyqtSignal
 
 from ..types.notification import (CachedNotification, Notification,
                                   NotificationHints)
@@ -113,12 +114,24 @@ class NotificationService(dbus.service.Object):
     )
     def CloseNotification(self, id: int):
         if id in self.notifications and not self.notifications[id].get("trashed"):
+            self.notifications[id]["closed_at"] = datetime.now(UTC)
             reason = NotificationCloseReason.CLOSED_BY_CALL_TO_CLOSENOTIFICATION
             self.NotificationClosed(id, reason)
             self.signaler.notification_closed.emit(id, reason)
 
         else:
             raise dbus.exceptions.DBusException()
+
+    @log_input_and_output(logging.INFO)
+    @dbus.decorators.method(  # type: ignore
+        "com.github.NotificationTray",
+        in_signature="",
+        out_signature="",
+    )
+    def CloseActiveNotifications(self):
+        for id, notification in self.notifications.items():
+            if not notification.get("closed_at"):
+                self.CloseNotification(id)
 
     @dbus.decorators.method("org.freedesktop.Notifications", out_signature="ssss")  # type: ignore
     def GetServerInformation(self) -> tuple[str, str, str, str]:

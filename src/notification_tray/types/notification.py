@@ -43,6 +43,7 @@ class Notification(TypedDict):
 class CachedNotification(Notification):
     path: Path
     trashed: NotRequired[bool]
+    closed_at: NotRequired[datetime]
 
 
 class NotificationFolder(TypedDict):
