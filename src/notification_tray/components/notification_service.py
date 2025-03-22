@@ -133,6 +133,28 @@ class NotificationService(dbus.service.Object):
             if not notification.get("closed_at"):
                 self.CloseNotification(id)
 
+    @log_input_and_output(logging.INFO)
+    @dbus.decorators.method(  # type: ignore
+        "com.github.NotificationTray",
+        in_signature="",
+        out_signature="",
+    )
+    def OpenActiveNotifications(self):
+        ids = list[tuple[int, str]]()
+        for id, notification in self.notifications.items():
+            if not notification.get("closed_at"):
+                actions = notification["actions"]
+                match len(actions):
+                    case 0:
+                        pass
+                    case 1:
+                        ids.append((id, next(iter(actions))))
+                    case _:
+                        raise dbus.exceptions.DBusException(f"Notification id {id} has more than one action")
+
+        for id, action_key in ids:
+            self.ActionInvoked(id, action_key)
+
     @dbus.decorators.method("org.freedesktop.Notifications", out_signature="ssss")  # type: ignore
     def GetServerInformation(self) -> tuple[str, str, str, str]:
         return ("notification-tray", "github.com", VERSION, "1.3")
