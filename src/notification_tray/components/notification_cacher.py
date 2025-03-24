@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Thread
@@ -41,7 +40,7 @@ class NotificationCacher(QObject):
 
     def cache_existing_notifications(self, root_path: Path):
         logger.info(f"Caching existing notifications under {root_path}")
-        for dirpath, _, filenames in os.walk(root_path):
+        for dirpath, _, filenames in root_path.walk():
             dirpath = Path(dirpath)
             filenames = [
                 f for f in filenames if f.endswith(".json") and f != ".settings.json"
