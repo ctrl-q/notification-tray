@@ -65,7 +65,8 @@ class NotificationService(dbus.service.Object):
         dbus_interface="org.freedesktop.Notifications", signature="uu"
     )
     def NotificationClosed(self, id: int, reason: NotificationCloseReason):
-        pass
+        if id in self.notifications:
+            self.notifications[id].setdefault("closed_at", datetime.now(UTC))
 
     @dbus.decorators.method(  # type: ignore
         "org.freedesktop.Notifications",
@@ -113,11 +114,12 @@ class NotificationService(dbus.service.Object):
         out_signature="",
     )
     def CloseNotification(self, id: int):
-        if id in self.notifications and not self.notifications[id].get("trashed"):
-            self.notifications[id]["closed_at"] = datetime.now(UTC)
-            reason = NotificationCloseReason.CLOSED_BY_CALL_TO_CLOSENOTIFICATION
-            self.NotificationClosed(id, reason)
-            self.signaler.notification_closed.emit(id, reason)
+        if id in self.notifications:
+            self.notifications[id].setdefault("closed_at", datetime.now(UTC))
+            if not self.notifications[id].get("trashed"):
+                reason = NotificationCloseReason.CLOSED_BY_CALL_TO_CLOSENOTIFICATION
+                self.NotificationClosed(id, reason)
+                self.signaler.notification_closed.emit(id, reason)
 
         else:
             raise dbus.exceptions.DBusException()
