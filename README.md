@@ -9,7 +9,8 @@ FreeDesktop-compliant notification daemon, with support for:
 
 ## Getting started
 
-1. Run `pip install git+https://github.com/ctrl-q/notification-tray.git`
+1. Clone this repository
+1. Run `pip install -r requirements.txt`
 1. Run `python __init__.py <path to notification storage directory>`
 
 
