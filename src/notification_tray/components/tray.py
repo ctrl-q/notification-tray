@@ -10,14 +10,14 @@ from PyQt5.QtWidgets import QAction, QApplication, QMenu, QSystemTrayIcon
 
 from notification_tray.components.notification_cacher import NotificationCacher
 from notification_tray.components.notifier import Notifier
-from notification_tray.types.notification import NotificationFolder
+from notification_tray_stubs.notification import NotificationFolder
 from notification_tray.utils import settings
 from notification_tray.utils.logging import log_input_and_output
 from notification_tray.utils.settings import (get_notification_backoff_minutes,
                                               is_do_not_disturb_active,
                                               is_hide_from_tray_active)
 
-from ..types.notification import CachedNotification
+from notification_tray_stubs.notification import CachedNotification
 
 logger = logging.getLogger(__name__)
 

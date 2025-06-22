@@ -6,7 +6,7 @@ import time
 import unicodedata
 from pathlib import Path
 
-from notification_tray.types.notification import Notification
+from notification_tray_stubs.notification import Notification
 from notification_tray.utils.logging import log_input_and_output
 
 MAX_FILENAME_LENGTH = 255  # `get_conf NAME_MAX .`

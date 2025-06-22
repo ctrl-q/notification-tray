@@ -8,7 +8,7 @@ from PyQt5.QtCore import QObject, pyqtSignal  # type: ignore
 from send2trash import send2trash as _send2trash
 
 from notification_tray.components.notifier import Notifier
-from notification_tray.types.notification import (CachedNotification,
+from notification_tray_stubs.notification import (CachedNotification,
                                                   NotificationFolder)
 from notification_tray.utils import settings
 from notification_tray.utils.logging import log_input_and_output

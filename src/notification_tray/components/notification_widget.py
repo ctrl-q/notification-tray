@@ -5,7 +5,7 @@ from PyQt5.QtGui import QIcon, QImage, QMouseEvent, QPixmap
 from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
                              QWidget)
 
-from ..types.notification import CachedNotification
+from notification_tray_stubs.notification import CachedNotification
 from .notification_service import NotificationCloseReason
 
 logger = logging.getLogger(__name__)

@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QApplication
 from notification_tray.components.notification_service import \
     NotificationCloseReason
 from notification_tray.components.notification_widget import NotificationWidget
-from notification_tray.types.notification import (CachedNotification,
+from notification_tray_stubs.notification import (CachedNotification,
                                                   NotificationFolder)
 from notification_tray.utils import settings
 from notification_tray.utils.settings import (get_do_not_disturb,

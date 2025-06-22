@@ -11,7 +11,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from notification_tray.utils.logging import log_input_and_output
 from notification_tray.utils.paths import get_output_path
 
-from ..types.notification import (CachedNotification, Notification,
+from notification_tray_stubs.notification import (CachedNotification, Notification,
                                   NotificationHints)
 
 logger = logging.getLogger(__name__)
