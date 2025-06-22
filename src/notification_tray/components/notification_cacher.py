@@ -124,7 +124,8 @@ class NotificationCacher(QObject):
                     send2trash(path)
                     mark_as_trashed(notifications["folders"][path.name])
                 else:
-                    notifications = notifications["folders"][path.name]
+                    if path != self.root_path:
+                        notifications = notifications["folders"][path.name]
                     for folder in notifications["folders"].values():
                         Thread(
                             target=self.trash, args=(folder["path"],), daemon=True

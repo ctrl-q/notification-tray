@@ -118,7 +118,7 @@ class Tray:
 
     def setup_tray_menu(self):
         self.tray_menu.clear()
-        self.add_directory_contents(self.root_path, self.tray_menu)
+        self.populate_submenu(self.tray_menu, self.notification_cacher.notification_cache)
 
         # Add exit option
         exit_action = QAction("Exit", self.tray_menu)
@@ -162,7 +162,7 @@ class Tray:
 
     def populate_submenu(self, submenu: QMenu, folder: NotificationFolder):
         path = folder["path"]
-        if submenu.actions()[0].text() == "Loading...":
+        if not (actions := submenu.actions()) or actions[0].text() == "Loading...":
             submenu.clear()
             self.add_directory_contents(path, submenu)
 
