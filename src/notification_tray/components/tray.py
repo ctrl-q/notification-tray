@@ -190,7 +190,7 @@ class Tray:
                 dnd_action = QAction(text, dnd_submenu)
                 dnd_action.triggered.connect(
                     lambda checked, p=str(path), d=duration: self.update_datetime_setting(  # type: ignore
-                        "do_not_disturb", p, d, cache=self.do_not_disturb
+                        "do_not_disturb_until", p, d, cache=self.do_not_disturb
                     )  # type: ignore
                 )
                 dnd_submenu.addAction(dnd_action)  # type: ignore
