@@ -22,6 +22,7 @@ from notification_tray.components.tray import Tray
 from notification_tray_stubs.notification import NotificationFolder
 from notification_tray.utils import settings
 from notification_tray.utils.fp import compose
+from uuid import uuid4
 
 logging.basicConfig(
     level=os.getenv("LOGLEVEL"),
@@ -39,10 +40,11 @@ class SystemTrayFileBrowser(QApplication):
 
     def __init__(self, root_path: Path):
         super().__init__([])
+        self.run_id = str(uuid4())
         logger.info(f"Starting application with root path {root_path}")
         self.root_path = root_path
         self.refresh_settings()
-        self.notification_service = NotificationService(self.root_path)
+        self.notification_service = NotificationService(self.root_path, run_id=str(self.run_id))
         self.try_set_lxqt_themes()
 
         self.notification_cache = NotificationFolder(
@@ -54,6 +56,7 @@ class SystemTrayFileBrowser(QApplication):
             notification_backoff_minutes=self.notification_backoff_minutes,
             notification_cache=self.notification_cache,
             parent=self,
+            run_id=self.run_id
         )
         self.notification_cacher = NotificationCacher(
             notification_cache=self.notification_cache,
@@ -62,6 +65,7 @@ class SystemTrayFileBrowser(QApplication):
             notification_backoff_minutes=self.notification_backoff_minutes,
             do_not_disturb=self.do_not_disturb,
             parent=self,
+            run_id=self.run_id,
         )
         self.notification_service.signaler.notification_ready.connect(
             compose(

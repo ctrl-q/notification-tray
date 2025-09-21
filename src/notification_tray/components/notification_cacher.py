@@ -28,6 +28,7 @@ class NotificationCacher(QObject):
         do_not_disturb: settings.Cache,
         notification_backoff_minutes: dict[Path, int],
         notification_cache: NotificationFolder,
+        run_id: str,
         parent: QObject | None = None,
     ):
         super().__init__(parent)
@@ -36,6 +37,7 @@ class NotificationCacher(QObject):
         self.notification_cache = notification_cache
         self.do_not_disturb = do_not_disturb
         self.notification_backoff_minutes = notification_backoff_minutes
+        self.run_id = run_id
         logger.info(f"Started notification cacher with root path {root_path}")
 
     def cache_existing_notifications(self, root_path: Path):

@@ -27,7 +27,7 @@ class Notifier(QObject):
     notification_closed = pyqtSignal(int, int, str, bool)
     last_notified: dict[Path, int] = {}
     started_at = datetime.now(UTC)
-    notification_widgets = dict[int, NotificationWidget]()
+    notification_widgets = dict[tuple[str, int], NotificationWidget]()
     offset = 0
 
     def __init__(
@@ -36,6 +36,7 @@ class Notifier(QObject):
         do_not_disturb: settings.Cache,
         notification_backoff_minutes: dict[Path, int],
         notification_cache: NotificationFolder,
+        run_id: str,
         parent: QObject | None = None,
     ) -> None:
         self.started_at = datetime.now(UTC)
@@ -43,6 +44,7 @@ class Notifier(QObject):
         self.do_not_disturb = do_not_disturb
         self.notification_backoff_minutes = notification_backoff_minutes
         self.notification_cache = notification_cache
+        self.run_id = run_id
         logger.info(f"Started notifier with root path {root_path}")
         super().__init__(parent)
 
@@ -50,7 +52,7 @@ class Notifier(QObject):
         logger.info(
             f"Got request to show notification {notification_widget.data['id']}"
         )
-        self.notification_widgets[notification_widget.data["id"]] = notification_widget
+        self.notification_widgets[(notification_widget.data["notification_tray_run_id"], notification_widget.data["id"])] = notification_widget
         screen = QApplication.primaryScreen()
         match screen:
             case None:
@@ -77,14 +79,15 @@ class Notifier(QObject):
                 )
                 self.offset += notification_widget.height() + 10
                 notification_widget.show()
-                notification_widget.displayed.connect(
-                    lambda: self.notification_displayed.emit(
-                        max(0, notification_widget.data["id"]),
-                        notification_widget.data["app_name"],
-                        notification_widget.data["summary"],
-                        notification_widget.data["body"],
+                if notification_widget.data["notification_tray_run_id"] == self.run_id:
+                    notification_widget.displayed.connect(
+                        lambda: self.notification_displayed.emit(
+                            max(0, notification_widget.data["id"]),
+                            notification_widget.data["app_name"],
+                            notification_widget.data["summary"],
+                            notification_widget.data["body"],
+                        )
                     )
-                )
                 notification_widget.displayed.emit()
             else:
                 logger.debug(
@@ -103,7 +106,7 @@ class Notifier(QObject):
                 notification_widget = notification_id_or_widget
             case int():
                 notification_widget = self.notification_widgets.get(
-                    notification_id_or_widget
+                    (self.run_id, notification_id_or_widget)
                 )
                 if notification_widget is None:
                     logger.error(
@@ -123,9 +126,7 @@ class Notifier(QObject):
                 notification_widget.data["id"],
                 reason.value,
                 str(notification_widget.data["path"]),
-                notification_widget.data["at"] >= self.started_at
-                and not is_batch
-                and notification_widget.data["id"] >= 0,
+                notification_widget.data["notification_tray_run_id"] == self.run_id,
             )
         self.offset = sum(
             widget.height() + 10
@@ -228,13 +229,12 @@ class Notifier(QObject):
                         self.close_notification, notification_widget, is_batch=is_batch
                     )
                 )
-                notification_widget.action_invoked.connect(
-                    lambda key: (
-                        self.action_invoked.emit(notification_widget.data["id"], key)
-                        if notification_widget.data["at"] >= self.started_at
-                        else None
+                if notification_widget.data["notification_tray_run_id"] == self.run_id:
+                    notification_widget.action_invoked.connect(
+                        lambda key: (
+                            self.action_invoked.emit(notification_widget.data["id"], key)
+                        )
                     )
-                )
                 self.show_or_queue_notification(notification_widget)
                 for notification in all_notifications:
                     parent = notification["path"].parent
@@ -258,6 +258,7 @@ class Notifier(QObject):
                         id=-1,
                         replaces_id=0,
                         path=self.root_path / "error.json",
+                        notification_tray_run_id=self.run_id,
                     )
                 )
 

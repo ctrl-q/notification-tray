@@ -2,7 +2,6 @@ import json
 import logging
 import re
 import sys
-import time
 import unicodedata
 from pathlib import Path
 
@@ -72,7 +71,7 @@ def get_output_path(root_path: Path, notification: Notification) -> Path:
 
     dir_ = get_outdir()
     suffix = ".json"
-    name = f"{time.strftime('%Y%m%d-%H%M%S')}-{notification['id']}"
+    name = f"{notification['notification_tray_run_id']}-{notification['id']}"
     name = name[: MAX_FILENAME_LENGTH - len(suffix)]
     output_path = str(dir_ / name)[: MAX_FILEPATH_LENGTH - len(suffix)] + suffix
     return Path(output_path)

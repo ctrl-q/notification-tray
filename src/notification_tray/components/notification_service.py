@@ -33,13 +33,14 @@ class NotificationServiceSignaler(QObject):
 class NotificationService(dbus.service.Object):
     notifications = dict[int, CachedNotification]()
 
-    def __init__(self, root_path: Path):
+    def __init__(self, root_path: Path, run_id: str):
         bus_name = dbus.service.BusName(
             "org.freedesktop.Notifications", bus=dbus.SessionBus()
         )
         super().__init__(bus_name, "/org/freedesktop/Notifications")
         self.root_path = root_path
         self.signaler = NotificationServiceSignaler()
+        self.run_id = run_id
         logger.info(f"Started notification service with root_path {root_path}")
 
     @log_input_and_output(logging.INFO)
@@ -99,6 +100,7 @@ class NotificationService(dbus.service.Object):
             actions=dict(zip(actions[::2], actions[1::2])),
             hints=hints,
             at=datetime.now(UTC),
+            notification_tray_run_id=self.run_id,
         )
         self.notifications[id] = CachedNotification(
             **notification, path=get_output_path(self.root_path, notification)

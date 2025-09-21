@@ -56,7 +56,7 @@ The files can be placed anywhere in between the base notification storage direct
 
 #### Notification grouping
 
-By default, every notification is stored under the notification storage directory, at `slugify(<app_name>)/slugify(<summary>)/strftime('%Y%m%d-%H%M%S')-<id>.json`
+By default, every notification is stored under the notification storage directory, at `slugify(<app_name>)/slugify(<summary>)/<unique run ID>-<id>.json`
 
 To change this, set `subdir_callback` in a .settings.json in any folder in that directory tree
 
