@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class NotificationCacher(QObject):
     notifications_cached = pyqtSignal()
+    notification_trashed = pyqtSignal(int)
 
     def __init__(
         self,
@@ -108,6 +109,8 @@ class NotificationCacher(QObject):
         def mark_as_trashed(folder: NotificationFolder):
             for notification in folder["notifications"].values():
                 notification["trashed"] = True
+                if notification["notification_tray_run_id"] == self.run_id:
+                    self.notification_trashed.emit(notification["id"])
             for subfolder in folder["folders"].values():
                 mark_as_trashed(subfolder)
 

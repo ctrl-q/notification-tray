@@ -69,6 +69,13 @@ class NotificationService(dbus.service.Object):
         if id in self.notifications:
             self.notifications[id].setdefault("closed_at", datetime.now(UTC))
 
+    @log_input_and_output(logging.INFO)
+    @dbus.decorators.signal(  # type: ignore
+        dbus_interface="org.freedesktop.Notifications", signature="u"
+    )
+    def NotificationPurged(self, id: int):
+        ...
+
     @dbus.decorators.method(  # type: ignore
         "org.freedesktop.Notifications",
         in_signature="susssasa{sv}i",

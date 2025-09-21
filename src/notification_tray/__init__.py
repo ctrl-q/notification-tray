@@ -109,6 +109,7 @@ class SystemTrayFileBrowser(QApplication):
             notification_backoff_minutes=self.notification_backoff_minutes,
         )
         self.notification_cacher.notifications_cached.connect(self.tray.refresh)
+        self.notification_cacher.notification_trashed.connect(self.notification_service.NotificationPurged)
         self.start_timer()
 
         self.application_started.connect(
