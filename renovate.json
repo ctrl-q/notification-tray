@@ -32,6 +32,8 @@
     "### Reviewer checklist\n> [!IMPORTANT]\n> Do not skip any item\n- [ ] I have reviewed the entire changelog\n- [ ] If there are new features that could be useful, I have created a PR or a ticket to take advantage of them (link it here)\n- [ ] If there are breaking changes, I've created a PR on top of this branch to take care of them (link it here)"
   ],
   "pep723": {
-    "fileMatch": ["^main.py$"]
+    "managerFilePatterns": [
+      "/^main.py$/"
+    ]
   }
 }
