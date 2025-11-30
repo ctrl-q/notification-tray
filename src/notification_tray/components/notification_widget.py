@@ -164,7 +164,7 @@ class NotificationWidget(QWidget):
                 button.setIcon(QIcon.fromTheme(value))
             else:
                 button.setText(value)
-            button.clicked.connect(lambda: self.action_invoked.emit(key))
+            button.clicked.connect(partial(self.action_invoked.emit, key))
             logger.debug(f"Adding action button {key} => {value}")
             button_layout.addWidget(button)
 
