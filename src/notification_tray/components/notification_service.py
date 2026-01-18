@@ -76,6 +76,7 @@ class NotificationService(dbus.service.Object):
     def NotificationPurged(self, id: int):
         ...
 
+    @log_input_and_output(logging.INFO)
     @dbus.decorators.method(  # type: ignore
         "org.freedesktop.Notifications",
         in_signature="susssasa{sv}i",
@@ -135,7 +136,7 @@ class NotificationService(dbus.service.Object):
 
     @log_input_and_output(logging.INFO)
     @dbus.decorators.method(  # type: ignore
-        "com.github.NotificationTray",
+        "org.freedesktop.Notifications",
         in_signature="",
         out_signature="",
     )
@@ -146,7 +147,7 @@ class NotificationService(dbus.service.Object):
 
     @log_input_and_output(logging.INFO)
     @dbus.decorators.method(  # type: ignore
-        "com.github.NotificationTray",
+        "org.freedesktop.Notifications",
         in_signature="",
         out_signature="",
     )
