@@ -1,11 +1,11 @@
 import logging
 
+from notification_tray_stubs.notification import CachedNotification
 from PyQt5.QtCore import QEvent, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon, QImage, QMouseEvent, QPixmap
 from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
                              QWidget)
 
-from notification_tray_stubs.notification import CachedNotification
 from .notification_service import NotificationCloseReason
 
 logger = logging.getLogger(__name__)

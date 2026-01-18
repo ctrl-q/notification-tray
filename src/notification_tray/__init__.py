@@ -8,8 +8,10 @@ import sys
 from functools import partial
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from dbus.mainloop.glib import DBusGMainLoop  # type: ignore
+from notification_tray_stubs.notification import NotificationFolder
 from PyQt5.QtCore import QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
@@ -19,10 +21,8 @@ from notification_tray.components.notification_service import (
     NotificationCloseReason, NotificationService)
 from notification_tray.components.notifier import Notifier
 from notification_tray.components.tray import Tray
-from notification_tray_stubs.notification import NotificationFolder
 from notification_tray.utils import settings
 from notification_tray.utils.fp import compose
-from uuid import uuid4
 
 logging.basicConfig(
     level=os.getenv("LOGLEVEL"),

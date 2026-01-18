@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 
+from notification_tray_stubs.notification import (CachedNotification,
+                                                  NotificationFolder)
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QScreen
 from PyQt5.QtMultimedia import QSound
@@ -11,8 +13,6 @@ from PyQt5.QtWidgets import QApplication
 from notification_tray.components.notification_service import \
     NotificationCloseReason
 from notification_tray.components.notification_widget import NotificationWidget
-from notification_tray_stubs.notification import (CachedNotification,
-                                                  NotificationFolder)
 from notification_tray.utils import settings
 from notification_tray.utils.settings import (get_do_not_disturb,
                                               get_notification_backoff_minutes,

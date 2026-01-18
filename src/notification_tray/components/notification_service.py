@@ -7,12 +7,10 @@ import dbus
 import dbus.decorators
 import dbus.service
 from PyQt5.QtCore import QObject, pyqtSignal
-
+from notification_tray_stubs.notification import CachedNotification, NotificationHints, Notification
 from notification_tray.utils.logging import log_input_and_output
 from notification_tray.utils.paths import get_output_path
 
-from notification_tray_stubs.notification import (CachedNotification, Notification,
-                                  NotificationHints)
 
 logger = logging.getLogger(__name__)
 VERSION = "0.0.1"
