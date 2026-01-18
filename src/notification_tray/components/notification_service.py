@@ -71,8 +71,7 @@ class NotificationService(dbus.service.Object):
     @dbus.decorators.signal(  # type: ignore
         dbus_interface="org.freedesktop.Notifications", signature="u"
     )
-    def NotificationPurged(self, id: int):
-        ...
+    def NotificationPurged(self, id: int): ...
 
     @log_input_and_output(logging.INFO)
     @dbus.decorators.method(  # type: ignore
@@ -160,7 +159,9 @@ class NotificationService(dbus.service.Object):
                     case 1:
                         ids.append((id, next(iter(actions))))
                     case _:
-                        raise dbus.exceptions.DBusException(f"Notification id {id} has more than one action")
+                        raise dbus.exceptions.DBusException(
+                            f"Notification id {id} has more than one action"
+                        )
 
         for id, action_key in ids:
             self.ActionInvoked(id, action_key)

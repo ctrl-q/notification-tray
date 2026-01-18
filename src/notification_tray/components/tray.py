@@ -118,7 +118,9 @@ class Tray:
 
     def setup_tray_menu(self):
         self.tray_menu.clear()
-        self.populate_submenu(self.tray_menu, self.notification_cacher.notification_cache)
+        self.populate_submenu(
+            self.tray_menu, self.notification_cacher.notification_cache
+        )
 
         # Add exit option
         exit_action = QAction("Exit", self.tray_menu)

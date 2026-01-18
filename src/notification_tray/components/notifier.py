@@ -52,7 +52,12 @@ class Notifier(QObject):
         logger.info(
             f"Got request to show notification {notification_widget.data['id']}"
         )
-        self.notification_widgets[(notification_widget.data["notification_tray_run_id"], notification_widget.data["id"])] = notification_widget
+        self.notification_widgets[
+            (
+                notification_widget.data["notification_tray_run_id"],
+                notification_widget.data["id"],
+            )
+        ] = notification_widget
         screen = QApplication.primaryScreen()
         match screen:
             case None:
@@ -232,7 +237,9 @@ class Notifier(QObject):
                 if notification_widget.data["notification_tray_run_id"] == self.run_id:
                     notification_widget.action_invoked.connect(
                         lambda key: (
-                            self.action_invoked.emit(notification_widget.data["id"], key)
+                            self.action_invoked.emit(
+                                notification_widget.data["id"], key
+                            )
                         )
                     )
                 self.show_or_queue_notification(notification_widget)

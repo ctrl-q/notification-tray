@@ -44,7 +44,9 @@ class SystemTrayFileBrowser(QApplication):
         logger.info(f"Starting application with root path {root_path}")
         self.root_path = root_path
         self.refresh_settings()
-        self.notification_service = NotificationService(self.root_path, run_id=str(self.run_id))
+        self.notification_service = NotificationService(
+            self.root_path, run_id=str(self.run_id)
+        )
         self.try_set_lxqt_themes()
 
         self.notification_cache = NotificationFolder(
@@ -56,7 +58,7 @@ class SystemTrayFileBrowser(QApplication):
             notification_backoff_minutes=self.notification_backoff_minutes,
             notification_cache=self.notification_cache,
             parent=self,
-            run_id=self.run_id
+            run_id=self.run_id,
         )
         self.notification_cacher = NotificationCacher(
             notification_cache=self.notification_cache,
@@ -109,7 +111,9 @@ class SystemTrayFileBrowser(QApplication):
             notification_backoff_minutes=self.notification_backoff_minutes,
         )
         self.notification_cacher.notifications_cached.connect(self.tray.refresh)
-        self.notification_cacher.notification_trashed.connect(self.notification_service.NotificationPurged)
+        self.notification_cacher.notification_trashed.connect(
+            self.notification_service.NotificationPurged
+        )
         self.start_timer()
 
         self.application_started.connect(
