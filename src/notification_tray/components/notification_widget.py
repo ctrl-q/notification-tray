@@ -1,10 +1,11 @@
 import logging
+from functools import partial
 
 from notification_tray_stubs.notification import CachedNotification
 from PyQt5.QtCore import QEvent, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon, QImage, QMouseEvent, QPixmap
-from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
-                             QWidget)
+from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QMenu, QPushButton,
+                             QVBoxLayout, QWidget)
 
 from .notification_service import NotificationCloseReason
 
@@ -25,6 +26,7 @@ class NotificationWidget(QWidget):
     action_invoked = pyqtSignal(str)
     displayed = pyqtSignal()
     closed = pyqtSignal(int)
+    snoozed = pyqtSignal(int)
 
     def __init__(self, data: CachedNotification):
         super().__init__()
@@ -117,6 +119,25 @@ class NotificationWidget(QWidget):
         layout = QVBoxLayout()
         top_layout = QHBoxLayout()
 
+        # Settings button with snooze menu
+        settings_button = QPushButton()
+        settings_button.setObjectName("settingsButton")
+        settings_button.setText("⚙")
+        
+        settings_menu = QMenu(self)
+        snooze_menu = settings_menu.addMenu("Snooze")
+        
+        snooze_1min = snooze_menu.addAction("1 minute")
+        snooze_5min = snooze_menu.addAction("5 minutes")
+        snooze_30min = snooze_menu.addAction("30 minutes")
+        
+        snooze_1min.triggered.connect(lambda: self.snooze_notification(60000))
+        snooze_5min.triggered.connect(lambda: self.snooze_notification(300000))
+        snooze_30min.triggered.connect(lambda: self.snooze_notification(1800000))
+        
+        settings_button.setMenu(settings_menu)
+        top_layout.addWidget(settings_button)
+
         logger.debug("Getting icon")
         try:
             icon = self._get_icon()
@@ -174,6 +195,12 @@ class NotificationWidget(QWidget):
 
         if self.data["expire_timeout"] and self.data["hints"].get("urgency") != 2:
             self.displayed.connect(self.schedule_close)
+
+    def snooze_notification(self, duration_ms: int):
+        logger.info(f"Snoozing notification {self.data['id']} for {duration_ms / 1000} seconds")
+        self.timer.stop()
+        self.snoozed.emit(duration_ms)
+        self.hide()
 
     def schedule_close(self):
         timeout = (

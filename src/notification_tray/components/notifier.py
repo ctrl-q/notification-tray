@@ -1,11 +1,11 @@
-import logging
+import os
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 
 from notification_tray_stubs.notification import (CachedNotification,
                                                   NotificationFolder)
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 from PyQt5.QtGui import QScreen
 from PyQt5.QtMultimedia import QSound
 from PyQt5.QtWidgets import QApplication
@@ -234,6 +234,9 @@ class Notifier(QObject):
                         self.close_notification, notification_widget, is_batch=is_batch
                     )
                 )
+                notification_widget.snoozed.connect(
+                    partial(self.snooze_notification, notification_widget)
+                )
                 if notification_widget.data["notification_tray_run_id"] == self.run_id:
                     notification_widget.action_invoked.connect(
                         lambda key: (
@@ -356,3 +359,36 @@ class Notifier(QObject):
                 logger.debug(
                     f"No notification sound found for notification {notification['id']}"
                 )
+
+    def snooze_notification(self, notification_widget: NotificationWidget, duration_ms: int):
+        logger.info(
+            f"Snoozing notification {notification_widget.data['id']} for {duration_ms / 1000} seconds"
+        )
+        
+        # Create a timer to re-display the notification
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        
+        # Store the notification data
+        notification_data = notification_widget.data.copy()
+        
+        # When timer expires, create a new notification widget and display it
+        def redisplay():
+            logger.info(f"Re-displaying snoozed notification {notification_data['id']}")
+            new_widget = NotificationWidget(notification_data)
+            new_widget.closed.connect(
+                partial(self.close_notification, new_widget, is_batch=False)
+            )
+            new_widget.snoozed.connect(
+                partial(self.snooze_notification, new_widget)
+            )
+            if new_widget.data["notification_tray_run_id"] == self.run_id:
+                new_widget.action_invoked.connect(
+                    lambda key: (
+                        self.action_invoked.emit(new_widget.data["id"], key)
+                    )
+                )
+            self.show_or_queue_notification(new_widget)
+        
+        timer.timeout.connect(redisplay)
+        timer.start(duration_ms)
