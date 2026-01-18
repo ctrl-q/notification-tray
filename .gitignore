@@ -79,3 +79,10 @@ CMakeUserPresets.json
 
 .cache
 build
+
+# AUR package build
+pkg/
+src/
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.log

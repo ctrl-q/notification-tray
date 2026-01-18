@@ -42,6 +42,33 @@ FreeDesktop-compliant notification daemon, with support for:
 sudo make install
 ```
 
+### Running as a systemd service
+
+After installation, you can run notification-tray as a systemd user service:
+
+```bash
+# Enable and start the service
+systemctl --user enable --now notification-tray.service
+
+# Check status
+systemctl --user status notification-tray
+
+# View logs
+journalctl --user -u notification-tray -f
+```
+
+The service will automatically store notifications in `~/.local/share/notification-tray`.
+
+To stop or disable the service:
+
+```bash
+# Stop the service
+systemctl --user stop notification-tray
+
+# Disable autostart
+systemctl --user disable notification-tray
+```
+
 
 ## Customization
 

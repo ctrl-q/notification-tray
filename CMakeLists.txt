@@ -89,6 +89,7 @@ add_executable(notification-tray src/main.cpp)
 target_link_libraries(notification-tray notification-tray-lib)
 
 install(TARGETS notification-tray DESTINATION bin)
+install(FILES notification-tray.service DESTINATION lib/systemd/user)
 
 # Testing configuration
 if(ENABLE_TESTING)
