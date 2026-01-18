@@ -1,5 +1,0 @@
-dbus-python==1.4.0
-pygobject==3.54.5
-pyqt5==5.15.11
-send2trash==1.8.3
-git+https://github.com/ctrl-q/notification-tray-stubs
