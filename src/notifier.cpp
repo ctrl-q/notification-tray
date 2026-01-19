@@ -146,7 +146,19 @@ void Notifier::notify(const std::vector<CachedNotification>& notifications, bool
 void Notifier::showOrQueueNotification(NotificationWidget* widget) {
     logger.info(QString("Got request to show notification %1").arg(widget->data.id));
 
-    m_notification_widgets[{widget->data.notification_tray_run_id, widget->data.id}] = widget;
+    auto key = std::make_pair(widget->data.notification_tray_run_id, widget->data.id);
+    auto it = m_notification_widgets.find(key);
+    if (it != m_notification_widgets.end()) {
+        // Close and delete the old widget before replacing it
+        NotificationWidget* old_widget = it->second;
+        if (old_widget->isVisible()) {
+            old_widget->close();
+        }
+        old_widget->deleteLater();
+        m_notification_widgets.erase(it);
+    }
+
+    m_notification_widgets[key] = widget;
 
     QScreen* screen = QGuiApplication::primaryScreen();
     if (!screen) {

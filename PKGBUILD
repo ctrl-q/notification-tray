@@ -1,6 +1,6 @@
 # Maintainer: ctrl-q <34975747+ctrl-q@users.noreply.github.com>
 pkgname=notification-tray-git
-pkgver=r77.4cc39e1
+pkgver=r78.7fbfd7f
 pkgrel=1
 pkgdesc="FreeDesktop-compliant notification daemon with grouping, DnD, batching, and persistence"
 arch=('x86_64')
