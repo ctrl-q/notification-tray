@@ -230,11 +230,6 @@ void NotificationCacher::cache(const CachedNotification& notification) {
 void NotificationCacher::trash(const fs::path& path) {
     logger.info(QString("Trashing %1").arg(QString::fromStdString(path.string())));
 
-    if (!fs::exists(path)) {
-        logger.info("Path does not exist. Skipping");
-        return;
-    }
-
     fs::path relative = fs::relative(path.parent_path(), m_root_path);
     NotificationFolder* current = &notification_cache;
     for (const auto& part : relative) {
@@ -253,6 +248,16 @@ void NotificationCacher::trash(const fs::path& path) {
                 if (current->notifications[filename].notification_tray_run_id == m_run_id) {
                     emit notificationTrashed(current->notifications[filename].id);
                 }
+            }
+        }
+    } else if (!fs::exists(path)) {
+        // Handle transient notifications that exist in cache but not on disk
+        QString filename = QString::fromStdString(path.filename().string());
+        if (current->notifications.count(filename)) {
+            logger.info(QString("Marking transient notification %1 as trashed").arg(filename));
+            current->notifications[filename].trashed = true;
+            if (current->notifications[filename].notification_tray_run_id == m_run_id) {
+                emit notificationTrashed(current->notifications[filename].id);
             }
         }
     } else {
