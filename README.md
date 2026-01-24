@@ -12,7 +12,11 @@ FreeDesktop-compliant notification daemon, with support for:
 ### Building from source
 
 1. Clone this repository
-2. Install dependencies:
+2. Set up git filters (for contributors):
+   ```bash
+   git config --local include.path '$GIT_DIR/../.gitconfig.local'
+   ```
+3. Install dependencies:
    ```bash
    # Ubuntu/Debian
    sudo apt-get install build-essential cmake qt5-default libqt5multimedia5-dev libdbus-1-dev libglib2.0-dev python3-dev
@@ -24,14 +28,14 @@ FreeDesktop-compliant notification daemon, with support for:
    sudo pacman -S base-devel cmake qt5-base qt5-multimedia dbus glib2 python
    ```
 
-3. Build:
+4. Build:
    ```bash
    mkdir -p build && cd build
    cmake ..
    make
    ```
 
-4. Run:
+5. Run:
    ```bash
    ./notification-tray <path to notification storage directory>
    ```

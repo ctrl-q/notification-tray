@@ -1,0 +1,5 @@
+# Git filter configuration for PKGBUILD
+# Run: git config --local include.path ../.gitconfig.local
+[filter "pkgver"]
+	clean = sed 's/^pkgver=.*/pkgver=1/'
+	smudge = cat
