@@ -28,6 +28,7 @@ public:
     void closeNotification(NotificationWidget* widget, NotificationCloseReason reason,
                            bool is_batch = false);
     void batchNotify();
+    bool hasActiveWidget(int notification_id) const;
 
 signals:
     void actionInvoked(int id, const QString& key);

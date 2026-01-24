@@ -385,3 +385,8 @@ void Notifier::snoozeNotification(NotificationWidget* widget, int duration_ms) {
 
     timer->start(duration_ms);
 }
+
+bool Notifier::hasActiveWidget(int notification_id) const {
+    auto it = m_notification_widgets.find({m_run_id, notification_id});
+    return it != m_notification_widgets.end();
+}

@@ -50,9 +50,6 @@ SystemTrayFileBrowser::SystemTrayFileBrowser(int& argc, char** argv, const fs::p
     connect(m_notification_service->signaler, &NotificationServiceSignaler::notificationClosed,
             this, &SystemTrayFileBrowser::closeNotificationFromDbusCall);
 
-    connect(m_notification_service->signaler, &NotificationServiceSignaler::notificationClosed,
-            this, &SystemTrayFileBrowser::trashFromDbusCall);
-
     connect(m_notifier.get(), &Notifier::notificationDisplayed, m_notification_service.get(),
             &NotificationService::NotificationDisplayed);
 
@@ -281,12 +278,15 @@ void SystemTrayFileBrowser::refreshSettings() {
 }
 
 void SystemTrayFileBrowser::closeNotificationFromDbusCall(int id, int reason) {
+    // Store whether widget exists BEFORE closing (which removes the widget)
+    bool had_widget = m_notifier->hasActiveWidget(id);
     m_notifier->closeNotification(id, static_cast<NotificationCloseReason>(reason), false);
-}
-
-void SystemTrayFileBrowser::trashFromDbusCall(int id, int reason) {
-    auto& notif = m_notification_service->notifications[id];
-    trashIfClosed(0, reason, QString::fromStdString(notif.path.string()), false);
+    
+    // If notification had a widget, trash it after closing
+    if (had_widget) {
+        auto& notif = m_notification_service->notifications[id];
+        trashIfClosed(0, reason, QString::fromStdString(notif.path.string()), false);
+    }
 }
 
 void SystemTrayFileBrowser::closeIfInThisRun(int id, int reason, const QString& path,

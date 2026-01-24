@@ -25,7 +25,6 @@ signals:
 
 private slots:
     void closeNotificationFromDbusCall(int id, int reason);
-    void trashFromDbusCall(int id, int reason);
     void closeIfInThisRun(int id, int reason, const QString& path, bool is_in_this_run);
     void trashIfClosed(int, int reason, const QString& path, bool);
 
