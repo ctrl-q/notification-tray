@@ -197,7 +197,8 @@ void Notifier::closeNotification(int notification_id, NotificationCloseReason re
                                  bool is_batch) {
     auto it = m_notification_widgets.find({m_run_id, notification_id});
     if (it == m_notification_widgets.end()) {
-        logger.error(QString("Could not find notification with id %1").arg(notification_id));
+        // Widget may already be closed (e.g., notification expired)
+        logger.debug(QString("No active widget for notification %1").arg(notification_id));
         return;
     }
     closeNotification(it->second, reason, is_batch);

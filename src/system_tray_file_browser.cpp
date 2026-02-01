@@ -278,15 +278,14 @@ void SystemTrayFileBrowser::refreshSettings() {
 }
 
 void SystemTrayFileBrowser::closeNotificationFromDbusCall(int id, int reason) {
-    // Store whether widget exists BEFORE closing (which removes the widget)
-    bool had_widget = m_notifier->hasActiveWidget(id);
-    m_notifier->closeNotification(id, static_cast<NotificationCloseReason>(reason), false);
-    
-    // If notification had a widget, trash it after closing
-    if (had_widget) {
-        auto& notif = m_notification_service->notifications[id];
-        trashIfClosed(0, reason, QString::fromStdString(notif.path.string()), false);
+    // Close the widget if it still exists (e.g., notification hasn't expired yet)
+    if (m_notifier->hasActiveWidget(id)) {
+        m_notifier->closeNotification(id, static_cast<NotificationCloseReason>(reason), false);
     }
+
+    // Always trash the notification, even if widget is already gone (e.g., expired)
+    auto& notif = m_notification_service->notifications[id];
+    trashIfClosed(0, reason, QString::fromStdString(notif.path.string()), false);
 }
 
 void SystemTrayFileBrowser::closeIfInThisRun(int id, int reason, const QString& path,
