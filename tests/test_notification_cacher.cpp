@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QThread>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -296,4 +297,24 @@ TEST_F(NotificationCacherTest, Trash_EmitsSignalForThisRun) {
 
     // Signal should be emitted because notification is from this run
     EXPECT_GE(spy.count(), 1);
+}
+
+TEST_F(NotificationCacherTest, Trash_RootPath_Trashes_AllNotifications) {
+    fs::path notif_path1 = root_path / "firefox" / "new-tab" / "run-1.json";
+    fs::path notif_path2 = root_path / "discord" / "message" / "run-2.json";
+    CachedNotification n1 = createTestNotification("Firefox", "New Tab", 1, notif_path1);
+    CachedNotification n2 = createTestNotification("Discord", "Message", 2, notif_path2);
+    cacher->cache(n1);
+    cacher->cache(n2);
+
+    ASSERT_TRUE(fs::exists(notif_path1));
+    ASSERT_TRUE(fs::exists(notif_path2));
+
+    cacher->trash(root_path);
+
+    // Give detached threads time to run
+    QThread::msleep(100);
+
+    EXPECT_FALSE(fs::exists(notif_path1));
+    EXPECT_FALSE(fs::exists(notif_path2));
 }

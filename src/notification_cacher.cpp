@@ -230,6 +230,17 @@ void NotificationCacher::cache(const CachedNotification& notification) {
 void NotificationCacher::trash(const fs::path& path) {
     logger.info(QString("Trashing %1").arg(QString::fromStdString(path.string())));
 
+    if (path == m_root_path) {
+        for (auto& [name, subfolder] : notification_cache.folders) {
+            std::thread([this, subfolder]() { trash(subfolder.path); }).detach();
+        }
+        for (auto& [name, notif] : notification_cache.notifications) {
+            std::thread([this, notif]() { trash(notif.path); }).detach();
+        }
+        emit notificationsCached();
+        return;
+    }
+
     fs::path relative = fs::relative(path.parent_path(), m_root_path);
     NotificationFolder* current = &notification_cache;
     for (const auto& part : relative) {
