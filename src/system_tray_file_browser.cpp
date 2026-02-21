@@ -36,6 +36,11 @@ SystemTrayFileBrowser::SystemTrayFileBrowser(int& argc, char** argv, const fs::p
         std::make_unique<Notifier>(m_root_path, m_do_not_disturb, m_notification_backoff_minutes,
                                    m_notification_cache, m_run_id, this);
 
+    // Set callback for NotificationService to check if a notification has an active widget
+    m_notification_service->hasActiveWidget = [this](int id) {
+        return m_notifier->hasActiveWidget(id);
+    };
+
     m_notification_cacher = std::make_unique<NotificationCacher>(
         m_root_path, m_notifier.get(), m_do_not_disturb, m_notification_backoff_minutes,
         m_notification_cache, m_run_id, this);
@@ -278,12 +283,12 @@ void SystemTrayFileBrowser::refreshSettings() {
 }
 
 void SystemTrayFileBrowser::closeNotificationFromDbusCall(int id, int reason) {
-    // Close the widget if it still exists (e.g., notification hasn't expired yet)
+    // Close the widget if it still exists
     if (m_notifier->hasActiveWidget(id)) {
         m_notifier->closeNotification(id, static_cast<NotificationCloseReason>(reason), false);
     }
 
-    // Always trash the notification, even if widget is already gone (e.g., expired)
+    // Always trash the notification when CloseNotification is called directly
     auto& notif = m_notification_service->notifications[id];
     trashIfClosed(0, reason, QString::fromStdString(notif.path.string()), false);
 }

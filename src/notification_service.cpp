@@ -102,7 +102,8 @@ void NotificationService::CloseNotification(uint id) {
 void NotificationService::CloseActiveNotifications() {
     logger.info("CloseActiveNotifications called");
     for (auto& [id, notification] : notifications) {
-        if (!notification.closed_at.has_value()) {
+        // Only close notifications that are currently displayed (have an active widget)
+        if (!notification.closed_at.has_value() && hasActiveWidget && hasActiveWidget(id)) {
             CloseNotification(id);
         }
     }

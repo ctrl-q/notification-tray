@@ -6,6 +6,7 @@
 #include <QObject>
 
 #include <filesystem>
+#include <functional>
 #include <map>
 
 namespace fs = std::filesystem;
@@ -31,6 +32,9 @@ public:
 
     std::map<int, CachedNotification> notifications;
     NotificationServiceSignaler* signaler;
+
+    // Callback to check if a notification has an active widget (set by SystemTrayFileBrowser)
+    std::function<bool(int)> hasActiveWidget;
 
 public slots:
     // Standard freedesktop.org Notifications methods (called by adaptor)
