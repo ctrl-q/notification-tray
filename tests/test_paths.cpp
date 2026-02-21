@@ -201,3 +201,61 @@ TEST_F(PathsTest, GetOutputPath_ConsistentOutput) {
     // Same notification should produce same path
     EXPECT_EQ(result1, result2);
 }
+
+// Tests for subdir_callback via getOutputPath
+
+TEST_F(PathsTest, GetOutputPath_UsesSubdirCallback) {
+    Notification n = createTestNotification("Firefox", "New Tab");
+
+    // Create app directory with .settings.json containing subdir_callback
+    fs::path app_dir = root_path / "firefox";
+    fs::create_directories(app_dir);
+
+    QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
+    settings_file.open(QIODevice::WriteOnly);
+    settings_file.write(R"({"subdir_callback": "lambda n: ['custom', 'subdir']"})");
+    settings_file.close();
+
+    fs::path result = Paths::getOutputPath(root_path, n);
+
+    // Should use custom subdir from callback
+    EXPECT_TRUE(result.string().find("custom") != std::string::npos);
+    EXPECT_TRUE(result.string().find("subdir") != std::string::npos);
+}
+
+TEST_F(PathsTest, GetOutputPath_SubdirCallbackUsesNotificationData) {
+    Notification n = createTestNotification("Firefox", "New Tab");
+    n.body = "test-body-content";
+
+    // Create app directory with .settings.json that uses notification data
+    fs::path app_dir = root_path / "firefox";
+    fs::create_directories(app_dir);
+
+    QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
+    settings_file.open(QIODevice::WriteOnly);
+    settings_file.write(R"({"subdir_callback": "lambda n: [n['body']]"})");
+    settings_file.close();
+
+    fs::path result = Paths::getOutputPath(root_path, n);
+
+    // Should use body content in path
+    EXPECT_TRUE(result.string().find("test-body-content") != std::string::npos);
+}
+
+TEST_F(PathsTest, GetOutputPath_SubdirCallbackNoneFallsBackToDefault) {
+    Notification n = createTestNotification("Firefox", "New Tab");
+
+    // Create app directory with .settings.json that returns None
+    fs::path app_dir = root_path / "firefox";
+    fs::create_directories(app_dir);
+
+    QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
+    settings_file.open(QIODevice::WriteOnly);
+    settings_file.write(R"({"subdir_callback": "lambda n: None"})");
+    settings_file.close();
+
+    fs::path result = Paths::getOutputPath(root_path, n);
+
+    // Should fall back to default path with summary slug
+    EXPECT_TRUE(result.string().find("new-tab") != std::string::npos);
+}

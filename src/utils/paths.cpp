@@ -124,8 +124,8 @@ std::optional<QStringList> Paths::evaluateSubdirCallback(const QString& callback
     PyDict_SetItemString(py_dict, "actions", py_actions);
     Py_XDECREF(py_actions);
 
-    // Evaluate the lambda expression
-    QString full_code = QString("result = (%1)").arg(callback_code);
+    // Evaluate the lambda expression by calling it with the notification dict
+    QString full_code = QString("result = (%1)(notification)").arg(callback_code);
     PyObject* globals = PyDict_New();
     PyDict_SetItemString(globals, "notification", py_dict);
 
