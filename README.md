@@ -118,9 +118,9 @@ To change this, set `subdir_callback` in a .settings.json in any folder in that 
 
 ```json5
 {
-    // (optional) lambda expression taking a notification dict as input, and returning either a list of strings representing the relative path, or None
-    // If the return value is None or contains no non-empty strings, the default outdir is used instead
-    "subdir_callback": "lambda notification: 'some subdirectory'"
+    // (optional) JavaScript arrow function taking a notification object as input, and returning either an array of strings representing the relative path, or null
+    // If the return value is null/undefined or contains no non-empty strings, the default outdir is used instead
+    "subdir_callback": "(n) => ['some subdirectory']"
 }
 ```
 
@@ -206,10 +206,9 @@ notification-tray-cpp/
 
 ### Dependencies
 
-- Qt5 (Core, Widgets, Multimedia, DBus, Test)
+- Qt5 (Core, Widgets, Multimedia, DBus, Test, Qml)
 - D-Bus 1.0
 - GLib 2.0
-- Python 3 (for subdir_callback lambda evaluation)
 - C++20 compiler (GCC 10+, Clang 10+)
 - Google Test (for unit tests)
 

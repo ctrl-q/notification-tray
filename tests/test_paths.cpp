@@ -213,7 +213,7 @@ TEST_F(PathsTest, GetOutputPath_UsesSubdirCallback) {
 
     QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
     settings_file.open(QIODevice::WriteOnly);
-    settings_file.write(R"({"subdir_callback": "lambda n: ['custom', 'subdir']"})");
+    settings_file.write(R"({"subdir_callback": "(n) => ['custom', 'subdir']"})");
     settings_file.close();
 
     fs::path result = Paths::getOutputPath(root_path, n);
@@ -233,7 +233,7 @@ TEST_F(PathsTest, GetOutputPath_SubdirCallbackUsesNotificationData) {
 
     QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
     settings_file.open(QIODevice::WriteOnly);
-    settings_file.write(R"({"subdir_callback": "lambda n: [n['body']]"})");
+    settings_file.write(R"({"subdir_callback": "(n) => [n.body]"})");
     settings_file.close();
 
     fs::path result = Paths::getOutputPath(root_path, n);
@@ -251,7 +251,7 @@ TEST_F(PathsTest, GetOutputPath_SubdirCallbackNoneFallsBackToDefault) {
 
     QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
     settings_file.open(QIODevice::WriteOnly);
-    settings_file.write(R"({"subdir_callback": "lambda n: None"})");
+    settings_file.write(R"({"subdir_callback": "(n) => null"})");
     settings_file.close();
 
     fs::path result = Paths::getOutputPath(root_path, n);

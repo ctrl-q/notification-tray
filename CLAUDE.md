@@ -50,4 +50,4 @@ This is a FreeDesktop-compliant notification daemon built with Qt5 and D-Bus.
 
 **Notification storage:** Notifications are stored at `slugify(app_name)/slugify(summary)/<run_id>-<id>.json`. Per-folder `.settings.json` files can customize behavior (grouping via `subdir_callback`, Do Not Disturb, backoff timing, sounds).
 
-**Python integration:** The `subdir_callback` setting evaluates Python lambda expressions to customize notification grouping paths.
+**JavaScript integration:** The `subdir_callback` setting evaluates JavaScript arrow functions (via Qt QJSEngine) to customize notification grouping paths.

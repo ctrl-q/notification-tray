@@ -3,19 +3,11 @@
 #include "utils/logging.h"
 
 #include <QFile>
+#include <QJSEngine>
+#include <QJSValue>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
-#include <QUuid>
-
-// Fix Python.h conflict with Qt's slots macro
-#ifdef slots
-    #undef slots
-    #include <Python.h>
-    #define slots Q_SLOTS
-#else
-    #include <Python.h>
-#endif
 
 static Logger logger = Logger::getLogger("Paths");
 
@@ -70,108 +62,75 @@ QString Paths::slugify(const QString& text) {
 
 std::optional<QStringList> Paths::evaluateSubdirCallback(const QString& callback_code,
                                                          const Notification& notification) {
-    // Initialize Python if not already initialized
-    static bool python_initialized = false;
-    if (!python_initialized) {
-        Py_Initialize();
-        python_initialized = true;
-    }
+    static QJSEngine engine;
 
-    // Build Python dictionary from notification
-    PyObject* py_dict = PyDict_New();
+    // Build notification object
+    QJSValue notifObj = engine.newObject();
+    notifObj.setProperty("app_name", notification.app_name);
+    notifObj.setProperty("summary", notification.summary);
+    notifObj.setProperty("body", notification.body);
+    notifObj.setProperty("app_icon", notification.app_icon);
+    notifObj.setProperty("id", notification.id);
+    notifObj.setProperty("replaces_id", notification.replaces_id);
+    notifObj.setProperty("expire_timeout", notification.expire_timeout);
 
-    PyDict_SetItemString(py_dict, "app_name",
-                         PyUnicode_FromString(notification.app_name.toUtf8().constData()));
-    PyDict_SetItemString(py_dict, "summary",
-                         PyUnicode_FromString(notification.summary.toUtf8().constData()));
-    PyDict_SetItemString(py_dict, "body",
-                         PyUnicode_FromString(notification.body.toUtf8().constData()));
-    PyDict_SetItemString(py_dict, "app_icon",
-                         PyUnicode_FromString(notification.app_icon.toUtf8().constData()));
-    PyDict_SetItemString(py_dict, "id", PyLong_FromLong(notification.id));
-    PyDict_SetItemString(py_dict, "replaces_id", PyLong_FromLong(notification.replaces_id));
-    PyDict_SetItemString(py_dict, "expire_timeout", PyLong_FromLong(notification.expire_timeout));
-
-    // Convert hints to Python dict
-    PyObject* py_hints = PyDict_New();
+    QJSValue hintsObj = engine.newObject();
     for (auto it = notification.hints.begin(); it != notification.hints.end(); ++it) {
-        QString key = it.key();
         QVariant value = it.value();
-
-        PyObject* py_value = nullptr;
-        if (value.type() == QVariant::String) {
-            py_value = PyUnicode_FromString(value.toString().toUtf8().constData());
+        if (value.type() == QVariant::Bool) {
+            hintsObj.setProperty(it.key(), value.toBool());
         } else if (value.type() == QVariant::Int || value.type() == QVariant::LongLong) {
-            py_value = PyLong_FromLongLong(value.toLongLong());
-        } else if (value.type() == QVariant::Bool) {
-            py_value = PyBool_FromLong(value.toBool());
+            hintsObj.setProperty(it.key(), (double)value.toLongLong());
         } else {
-            py_value = PyUnicode_FromString(value.toString().toUtf8().constData());
+            hintsObj.setProperty(it.key(), value.toString());
         }
-
-        PyDict_SetItemString(py_hints, key.toUtf8().constData(), py_value);
-        Py_XDECREF(py_value);
     }
-    PyDict_SetItemString(py_dict, "hints", py_hints);
-    Py_XDECREF(py_hints);
+    notifObj.setProperty("hints", hintsObj);
 
-    // Convert actions to Python dict
-    PyObject* py_actions = PyDict_New();
+    QJSValue actionsObj = engine.newObject();
     for (auto it = notification.actions.begin(); it != notification.actions.end(); ++it) {
-        PyDict_SetItemString(py_actions, it->first.toUtf8().constData(),
-                             PyUnicode_FromString(it->second.toUtf8().constData()));
+        actionsObj.setProperty(it->first, it->second);
     }
-    PyDict_SetItemString(py_dict, "actions", py_actions);
-    Py_XDECREF(py_actions);
+    notifObj.setProperty("actions", actionsObj);
 
-    // Evaluate the lambda expression by calling it with the notification dict
-    QString full_code = QString("result = (%1)(notification)").arg(callback_code);
-    PyObject* globals = PyDict_New();
-    PyDict_SetItemString(globals, "notification", py_dict);
+    QJSValue func = engine.evaluate(QString("(%1)").arg(callback_code));
+    if (func.isError()) {
+        logger.error(QString("Failed to compile subdir_callback: %1").arg(func.toString()));
+        return std::nullopt;
+    }
 
-    PyObject* locals = PyDict_New();
+    QJSValue result = func.call({notifObj});
+    if (result.isError()) {
+        logger.error(QString("Failed to evaluate subdir_callback: %1").arg(result.toString()));
+        return std::nullopt;
+    }
 
-    PyRun_String(full_code.toUtf8().constData(), Py_file_input, globals, locals);
+    if (result.isNull() || result.isUndefined()) {
+        return std::nullopt;
+    }
 
-    std::optional<QStringList> result;
-
-    if (PyErr_Occurred()) {
-        PyErr_Print();
-        logger.error("Failed to evaluate subdir_callback");
-    } else {
-        PyObject* py_result = PyDict_GetItemString(locals, "result");
-        if (py_result && PyList_Check(py_result)) {
-            QStringList string_list;
-            Py_ssize_t size = PyList_Size(py_result);
-
-            bool all_strings = true;
-            for (Py_ssize_t i = 0; i < size; ++i) {
-                PyObject* item = PyList_GetItem(py_result, i);
-                if (PyUnicode_Check(item)) {
-                    const char* str = PyUnicode_AsUTF8(item);
-                    if (str && strlen(str) > 0) {
-                        string_list.append(QString::fromUtf8(str));
-                    }
-                } else {
-                    all_strings = false;
-                    break;
+    if (result.isArray()) {
+        QStringList string_list;
+        int length = result.property("length").toInt();
+        bool all_strings = true;
+        for (int i = 0; i < length; ++i) {
+            QJSValue item = result.property(i);
+            if (item.isString()) {
+                QString s = item.toString();
+                if (!s.isEmpty()) {
+                    string_list.append(s);
                 }
+            } else {
+                all_strings = false;
+                break;
             }
-
-            if (all_strings && !string_list.isEmpty()) {
-                result = string_list;
-            }
-        } else if (py_result == Py_None || !py_result) {
-            // Return nullopt for None or empty
-            result = std::nullopt;
+        }
+        if (all_strings && !string_list.isEmpty()) {
+            return string_list;
         }
     }
 
-    Py_XDECREF(py_dict);
-    Py_XDECREF(globals);
-    Py_XDECREF(locals);
-
-    return result;
+    return std::nullopt;
 }
 
 fs::path Paths::getCustomOutputDir(const fs::path& root_path, const fs::path& default_outdir,

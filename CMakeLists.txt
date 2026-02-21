@@ -13,9 +13,8 @@ option(ENABLE_TESTING "Enable unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 
-find_package(Qt5 REQUIRED COMPONENTS Core Widgets Multimedia DBus Test)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Multimedia DBus Test Qml)
 find_package(PkgConfig REQUIRED)
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 pkg_check_modules(DBUS REQUIRED dbus-1)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 
@@ -23,7 +22,6 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${DBUS_INCLUDE_DIRS}
     ${GLIB_INCLUDE_DIRS}
-    ${Python3_INCLUDE_DIRS}
 )
 
 # Library sources (for testing, excludes main.cpp)
@@ -79,9 +77,9 @@ target_link_libraries(notification-tray-lib
     Qt5::Widgets
     Qt5::Multimedia
     Qt5::DBus
+    Qt5::Qml
     ${DBUS_LIBRARIES}
     ${GLIB_LIBRARIES}
-    Python3::Python
 )
 
 # Main executable
