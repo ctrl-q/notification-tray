@@ -312,3 +312,86 @@ TEST_F(SettingsTest, WriteDateTimeSetting_OverwritesExistingValue) {
 
     EXPECT_EQ(obj["do_not_disturb_until"].toString(), new_time.toString(Qt::ISODate));
 }
+
+// Tests for getSoundFile
+
+TEST_F(SettingsTest, GetSoundFile_NoSettingsFile) {
+    fs::path folder = root_path / "app" / "summary";
+    fs::create_directories(folder);
+
+    std::string result = Settings::getSoundFile(root_path, folder);
+    EXPECT_TRUE(result.empty());
+}
+
+TEST_F(SettingsTest, GetSoundFile_AbsolutePath) {
+    fs::path folder = root_path / "app";
+
+    QJsonObject settings;
+    settings["sound"] = "/usr/share/sounds/alert.wav";
+    createSettingsFile(folder, settings);
+
+    std::string result = Settings::getSoundFile(root_path, folder);
+    EXPECT_EQ(result, "/usr/share/sounds/alert.wav");
+}
+
+TEST_F(SettingsTest, GetSoundFile_RelativePathResolvedToSettingsDir) {
+    fs::path folder = root_path / "app";
+
+    QJsonObject settings;
+    settings["sound"] = "alert.wav";
+    createSettingsFile(folder, settings);
+
+    std::string result = Settings::getSoundFile(root_path, folder);
+    EXPECT_EQ(result, (folder / "alert.wav").string());
+}
+
+TEST_F(SettingsTest, GetSoundFile_InheritedFromParent) {
+    fs::path app_folder = root_path / "app";
+    fs::path summary_folder = root_path / "app" / "summary";
+    fs::create_directories(summary_folder);
+
+    QJsonObject settings;
+    settings["sound"] = "/sounds/notify.wav";
+    createSettingsFile(app_folder, settings);
+
+    std::string result = Settings::getSoundFile(root_path, summary_folder);
+    EXPECT_EQ(result, "/sounds/notify.wav");
+}
+
+TEST_F(SettingsTest, GetSoundFile_ChildOverridesParent) {
+    fs::path app_folder = root_path / "app";
+    fs::path summary_folder = root_path / "app" / "summary";
+
+    QJsonObject parent_settings;
+    parent_settings["sound"] = "/sounds/parent.wav";
+    createSettingsFile(app_folder, parent_settings);
+
+    QJsonObject child_settings;
+    child_settings["sound"] = "/sounds/child.wav";
+    createSettingsFile(summary_folder, child_settings);
+
+    std::string result = Settings::getSoundFile(root_path, summary_folder);
+    EXPECT_EQ(result, "/sounds/child.wav");
+}
+
+TEST_F(SettingsTest, GetSoundFile_EmptyStringReturnsEmpty) {
+    fs::path folder = root_path / "app";
+
+    QJsonObject settings;
+    settings["sound"] = "";
+    createSettingsFile(folder, settings);
+
+    std::string result = Settings::getSoundFile(root_path, folder);
+    EXPECT_TRUE(result.empty());
+}
+
+TEST_F(SettingsTest, GetSoundFile_MissingKeyReturnsEmpty) {
+    fs::path folder = root_path / "app";
+
+    QJsonObject settings;
+    settings["other_setting"] = "value";
+    createSettingsFile(folder, settings);
+
+    std::string result = Settings::getSoundFile(root_path, folder);
+    EXPECT_TRUE(result.empty());
+}

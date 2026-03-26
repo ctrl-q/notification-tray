@@ -15,6 +15,8 @@ public:
     static int getNotificationBackoffMinutes(const fs::path& root_path, const fs::path& folder_path,
                                              const std::map<fs::path, int>& cache);
 
+    static std::string getSoundFile(const fs::path& root_path, const fs::path& folder_path);
+
     static bool isDoNotDisturbActive(const fs::path& root_path, const fs::path& folder_path,
                                      const Cache& cache);
 

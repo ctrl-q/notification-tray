@@ -17,6 +17,34 @@ int Settings::getNotificationBackoffMinutes(const fs::path& root_path, const fs:
     return 0;
 }
 
+std::string Settings::getSoundFile(const fs::path& root_path, const fs::path& folder_path) {
+    for (auto p = folder_path; p != root_path.parent_path(); p = p.parent_path()) {
+        fs::path settings_file = p / ".settings.json";
+        QFile file(QString::fromStdString(settings_file.string()));
+        if (!file.open(QIODevice::ReadOnly))
+            continue;
+
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (!doc.isObject())
+            continue;
+
+        QJsonObject obj = doc.object();
+        if (!obj.contains("sound"))
+            continue;
+
+        QString sound = obj["sound"].toString();
+        if (sound.isEmpty())
+            continue;
+
+        fs::path sound_path(sound.toStdString());
+        if (sound_path.is_relative())
+            sound_path = p / sound_path;
+
+        return sound_path.string();
+    }
+    return {};
+}
+
 bool Settings::isDoNotDisturbActive(const fs::path& root_path, const fs::path& folder_path,
                                     const Cache& cache) {
     return isDateTimeSettingActive(folder_path, root_path, cache);

@@ -323,14 +323,9 @@ void Notifier::playNotificationSound(const CachedNotification& notification) {
         QString sound_name = notification.hints["sound-name"].toString();
         audio_path = QString("/usr/share/sounds/freedesktop/%1.oga").arg(sound_name);
     } else {
-        fs::path current = notification.path.parent_path();
-        while (current != m_root_path.parent_path()) {
-            fs::path sound_file = current / ".notification.wav";
-            if (fs::exists(sound_file)) {
-                audio_path = QString::fromStdString(sound_file.string());
-                break;
-            }
-            current = current.parent_path();
+        std::string sound_file = Settings::getSoundFile(m_root_path, notification.path.parent_path());
+        if (!sound_file.empty()) {
+            audio_path = QString::fromStdString(sound_file);
         }
     }
 

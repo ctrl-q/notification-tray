@@ -274,8 +274,7 @@ void NotificationCacher::trash(const fs::path& path) {
     } else {
         bool has_settings = false;
         for (const auto& entry : fs::recursive_directory_iterator(path)) {
-            if (entry.path().filename() == ".settings.json" ||
-                entry.path().filename() == ".notification.wav") {
+            if (entry.path().filename() == ".settings.json") {
                 has_settings = true;
                 break;
             }

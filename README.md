@@ -136,7 +136,11 @@ If you receive multiple notifications in quick succession, and would like to rec
 
 #### Custom notification sounds
 
-Place a .notification.wav file under any folder to set it as the notification sound for that folder
+Set `sound` to a file path in `.settings.json` to play a custom sound for notifications in that folder. The path can be absolute or relative to the folder containing `.settings.json`. Child folders inherit the setting from parent folders, and a more specific setting takes precedence.
+
+```json
+{ "sound": "notify.wav" }
+```
 
 #### Notification timeout
 
