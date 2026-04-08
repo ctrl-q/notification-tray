@@ -38,6 +38,14 @@ FreeDesktop-compliant notification daemon, with support for:
 
 ### Installation
 
+#### Arch Linux
+
+```bash
+yay -S notificaion-tray-git
+```
+
+#### From source
+
 ```bash
 sudo make install
 ```
