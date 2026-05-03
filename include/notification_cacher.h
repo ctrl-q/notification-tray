@@ -24,6 +24,7 @@ public:
     void cacheExistingNotifications(const fs::path& root_path);
     void cache(const CachedNotification& notification);
     void trash(const fs::path& path);
+    void clear(const fs::path& path);
 
     NotificationFolder& notification_cache;
 

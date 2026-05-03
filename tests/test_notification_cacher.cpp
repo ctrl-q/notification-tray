@@ -318,3 +318,70 @@ TEST_F(NotificationCacherTest, Trash_RootPath_Trashes_AllNotifications) {
     EXPECT_FALSE(fs::exists(notif_path1));
     EXPECT_FALSE(fs::exists(notif_path2));
 }
+
+// Tests for clear()
+
+TEST_F(NotificationCacherTest, Clear_TransientNotification_MarkedAsTrashed) {
+    fs::path notif_path = root_path / "firefox" / "new-tab" / "run-1.json";
+    CachedNotification n = createTestNotification("Firefox", "New Tab", 1, notif_path);
+    n.hints["transient"] = true;
+    cacher->cache(n);
+
+    ASSERT_FALSE(fs::exists(notif_path));
+
+    cacher->clear(notif_path);
+
+    auto& notifications = notification_cache.folders["firefox"].folders["new-tab"].notifications;
+    ASSERT_FALSE(notifications.empty());
+    EXPECT_TRUE(notifications.begin()->second.trashed);
+}
+
+TEST_F(NotificationCacherTest, Clear_TransientFolder_MarkedAsTrashed) {
+    fs::path notif_path1 = root_path / "firefox" / "new-tab" / "run-1.json";
+    fs::path notif_path2 = root_path / "firefox" / "new-tab" / "run-2.json";
+    CachedNotification n1 = createTestNotification("Firefox", "New Tab 1", 1, notif_path1);
+    CachedNotification n2 = createTestNotification("Firefox", "New Tab 2", 2, notif_path2);
+    n1.hints["transient"] = true;
+    n2.hints["transient"] = true;
+    cacher->cache(n1);
+    cacher->cache(n2);
+
+    ASSERT_FALSE(fs::exists(notif_path1));
+    ASSERT_FALSE(fs::exists(notif_path2));
+
+    // Clear at the "new-tab" folder level (no files exist on disk)
+    fs::path folder_path = root_path / "firefox" / "new-tab";
+    cacher->clear(folder_path);
+
+    auto& notifications = notification_cache.folders["firefox"].folders["new-tab"].notifications;
+    for (auto& [name, notif] : notifications) {
+        EXPECT_TRUE(notif.trashed);
+    }
+}
+
+TEST_F(NotificationCacherTest, Clear_TransientFolder_EmitsSignals) {
+    fs::path notif_path = root_path / "firefox" / "new-tab" / "run-1.json";
+    CachedNotification n = createTestNotification("Firefox", "New Tab", 1, notif_path);
+    n.hints["transient"] = true;
+    cacher->cache(n);
+
+    QSignalSpy spy(cacher.get(), &NotificationCacher::notificationTrashed);
+    ASSERT_TRUE(spy.isValid());
+
+    fs::path folder_path = root_path / "firefox" / "new-tab";
+    cacher->clear(folder_path);
+
+    EXPECT_GE(spy.count(), 1);
+}
+
+TEST_F(NotificationCacherTest, Clear_DiskNotification_MovedToTrash) {
+    fs::path notif_path = root_path / "firefox" / "new-tab" / "run-1.json";
+    CachedNotification n = createTestNotification("Firefox", "New Tab", 1, notif_path);
+    cacher->cache(n);
+
+    ASSERT_TRUE(fs::exists(notif_path));
+
+    cacher->clear(notif_path);
+
+    EXPECT_FALSE(fs::exists(notif_path));
+}

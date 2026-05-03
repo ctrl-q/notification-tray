@@ -229,13 +229,18 @@ void NotificationCacher::cache(const CachedNotification& notification) {
 
 void NotificationCacher::trash(const fs::path& path) {
     logger.info(QString("Trashing %1").arg(QString::fromStdString(path.string())));
+    clear(path);
+}
+
+void NotificationCacher::clear(const fs::path& path) {
+    logger.info(QString("Clearing %1").arg(QString::fromStdString(path.string())));
 
     if (path == m_root_path) {
         for (auto& [name, subfolder] : notification_cache.folders) {
-            std::thread([this, subfolder]() { trash(subfolder.path); }).detach();
+            std::thread([this, subfolder]() { clear(subfolder.path); }).detach();
         }
         for (auto& [name, notif] : notification_cache.notifications) {
-            std::thread([this, notif]() { trash(notif.path); }).detach();
+            std::thread([this, notif]() { clear(notif.path); }).detach();
         }
         emit notificationsCached();
         return;
@@ -262,14 +267,17 @@ void NotificationCacher::trash(const fs::path& path) {
             }
         }
     } else if (!fs::exists(path)) {
-        // Handle transient notifications that exist in cache but not on disk
+        // Handle transient items that exist in cache but not on disk
         QString filename = QString::fromStdString(path.filename().string());
         if (current->notifications.count(filename)) {
-            logger.info(QString("Marking transient notification %1 as trashed").arg(filename));
+            logger.info(QString("Clearing transient notification %1").arg(filename));
             current->notifications[filename].trashed = true;
             if (current->notifications[filename].notification_tray_run_id == m_run_id) {
                 emit notificationTrashed(current->notifications[filename].id);
             }
+        } else if (current->folders.count(filename)) {
+            logger.info(QString("Clearing transient folder %1").arg(filename));
+            markAsTrashed(current->folders[filename]);
         }
     } else {
         bool has_settings = false;
@@ -291,10 +299,10 @@ void NotificationCacher::trash(const fs::path& path) {
             if (current->folders.count(folder_name)) {
                 NotificationFolder& folder = current->folders[folder_name];
                 for (auto& [name, subfolder] : folder.folders) {
-                    std::thread([this, subfolder]() { trash(subfolder.path); }).detach();
+                    std::thread([this, subfolder]() { clear(subfolder.path); }).detach();
                 }
                 for (auto& [name, notif] : folder.notifications) {
-                    std::thread([this, notif]() { trash(notif.path); }).detach();
+                    std::thread([this, notif]() { clear(notif.path); }).detach();
                 }
             }
         }

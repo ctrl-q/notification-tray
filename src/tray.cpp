@@ -205,9 +205,9 @@ void Tray::populateSubmenu(QMenu* submenu, NotificationFolder& folder) {
 
     fs::path folder_path = folder.path;  // Capture by value to avoid dangling reference
 
-    QAction* trash_action = new QAction("Move to Trash", submenu);
+    QAction* trash_action = new QAction("Clear", submenu);
     connect(trash_action, &QAction::triggered,
-            [this, folder_path]() { m_notification_cacher->trash(folder_path); });
+            [this, folder_path]() { m_notification_cacher->clear(folder_path); });
     submenu->addAction(trash_action);
 
     QAction* show_all = new QAction("Show All", submenu);
