@@ -1,6 +1,8 @@
 #include "notification_types.h"
 #include "utils/paths.h"
+#include "utils/settings.h"
 
+#include <QJsonObject>
 #include <QTemporaryDir>
 
 #include <gtest/gtest.h>
@@ -11,6 +13,12 @@ protected:
         temp_dir = std::make_unique<QTemporaryDir>();
         ASSERT_TRUE(temp_dir->isValid());
         root_path = fs::path(temp_dir->path().toStdString());
+
+        Settings::resetConfigCache();
+
+        fs::path config_path = Settings::getConfigPath();
+        std::error_code ec;
+        fs::remove(config_path, ec);
     }
 
     void TearDown() override { temp_dir.reset(); }
@@ -28,6 +36,15 @@ protected:
         n.notification_tray_run_id = run_id;
         n.at = QDateTime::currentDateTimeUtc();
         return n;
+    }
+
+    void setFolderSettings(const fs::path& folder, const QJsonObject& settings) {
+        QJsonObject config = Settings::loadConfig();
+        QJsonObject folders = config["folders"].toObject();
+        QString key = QString::fromStdString(Settings::getFolderKey(root_path, folder));
+        folders[key] = settings;
+        config["folders"] = folders;
+        ASSERT_TRUE(Settings::writeConfig(config));
     }
 
     std::unique_ptr<QTemporaryDir> temp_dir;
@@ -207,14 +224,9 @@ TEST_F(PathsTest, GetOutputPath_ConsistentOutput) {
 TEST_F(PathsTest, GetOutputPath_UsesSubdirCallback) {
     Notification n = createTestNotification("Firefox", "New Tab");
 
-    // Create app directory with .settings.json containing subdir_callback
     fs::path app_dir = root_path / "firefox";
     fs::create_directories(app_dir);
-
-    QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
-    settings_file.open(QIODevice::WriteOnly);
-    settings_file.write(R"({"subdir_callback": "(n) => ['custom', 'subdir']"})");
-    settings_file.close();
+    setFolderSettings(app_dir, QJsonObject{{"subdir_callback", "(n) => ['custom', 'subdir']"}});
 
     fs::path result = Paths::getOutputPath(root_path, n);
 
@@ -227,14 +239,9 @@ TEST_F(PathsTest, GetOutputPath_SubdirCallbackUsesNotificationData) {
     Notification n = createTestNotification("Firefox", "New Tab");
     n.body = "test-body-content";
 
-    // Create app directory with .settings.json that uses notification data
     fs::path app_dir = root_path / "firefox";
     fs::create_directories(app_dir);
-
-    QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
-    settings_file.open(QIODevice::WriteOnly);
-    settings_file.write(R"({"subdir_callback": "(n) => [n.body]"})");
-    settings_file.close();
+    setFolderSettings(app_dir, QJsonObject{{"subdir_callback", "(n) => [n.body]"}});
 
     fs::path result = Paths::getOutputPath(root_path, n);
 
@@ -245,17 +252,39 @@ TEST_F(PathsTest, GetOutputPath_SubdirCallbackUsesNotificationData) {
 TEST_F(PathsTest, GetOutputPath_SubdirCallbackNoneFallsBackToDefault) {
     Notification n = createTestNotification("Firefox", "New Tab");
 
-    // Create app directory with .settings.json that returns None
     fs::path app_dir = root_path / "firefox";
     fs::create_directories(app_dir);
-
-    QFile settings_file(QString::fromStdString((app_dir / ".settings.json").string()));
-    settings_file.open(QIODevice::WriteOnly);
-    settings_file.write(R"({"subdir_callback": "(n) => null"})");
-    settings_file.close();
+    setFolderSettings(app_dir, QJsonObject{{"subdir_callback", "(n) => null"}});
 
     fs::path result = Paths::getOutputPath(root_path, n);
 
     // Should fall back to default path with summary slug
     EXPECT_TRUE(result.string().find("new-tab") != std::string::npos);
+}
+
+TEST_F(PathsTest, GetOutputPath_UsesRootSubdirCallback) {
+    Notification n = createTestNotification("Firefox", "New Tab");
+
+    setFolderSettings(root_path, QJsonObject{{"subdir_callback", "(n) => ['from-root']"}});
+
+    fs::path result = Paths::getOutputPath(root_path, n);
+
+    EXPECT_TRUE(result.string().find("from-root") != std::string::npos);
+}
+
+TEST_F(PathsTest, GetOutputPath_SubdirCallbackUsesFirstValidFromRootToLeaf) {
+    Notification n = createTestNotification("Firefox", "New Tab");
+
+    fs::path app_dir = root_path / "firefox";
+    fs::create_directories(app_dir);
+    fs::path summary_dir = app_dir / "new-tab";
+    fs::create_directories(summary_dir);
+
+    setFolderSettings(app_dir, QJsonObject{{"subdir_callback", "(n) => ['from-app']"}});
+    setFolderSettings(summary_dir, QJsonObject{{"subdir_callback", "(n) => ['from-summary']"}});
+
+    fs::path result = Paths::getOutputPath(root_path, n);
+
+    EXPECT_TRUE(result.string().find("from-app") != std::string::npos);
+    EXPECT_TRUE(result.string().find("from-summary") == std::string::npos);
 }

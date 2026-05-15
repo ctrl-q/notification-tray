@@ -48,6 +48,6 @@ This is a FreeDesktop-compliant notification daemon built with Qt5 and D-Bus.
 - `CachedNotification` - persisted notification with path and closed state
 - `NotificationFolder` - recursive tree structure for organizing notifications
 
-**Notification storage:** Notifications are stored at `slugify(app_name)/slugify(summary)/<run_id>-<id>.json`. Per-folder `.settings.json` files can customize behavior (grouping via `subdir_callback`, Do Not Disturb, backoff timing, sounds).
+**Notification storage:** Notifications are stored at `slugify(app_name)/slugify(summary)/<run_id>-<id>.json`. Settings are stored globally at `QStandardPaths::ConfigLocation/notification-tray/settings.json` with per-folder keys under `folders` (grouping via `subdir_callback`, Do Not Disturb, backoff timing, sounds).
 
 **JavaScript integration:** The `subdir_callback` setting evaluates JavaScript arrow functions (via Qt QJSEngine) to customize notification grouping paths.

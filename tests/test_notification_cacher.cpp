@@ -1,5 +1,6 @@
 #include "notification_cacher.h"
 #include "notifier.h"
+#include "utils/settings.h"
 
 #include <QFile>
 #include <QJsonDocument>
@@ -17,6 +18,12 @@ protected:
         temp_dir = std::make_unique<QTemporaryDir>();
         ASSERT_TRUE(temp_dir->isValid());
         root_path = fs::path(temp_dir->path().toStdString());
+
+        Settings::resetConfigCache();
+
+        fs::path config_path = Settings::getConfigPath();
+        std::error_code ec;
+        fs::remove(config_path, ec);
 
         // Initialize shared state
         do_not_disturb.clear();
@@ -203,21 +210,17 @@ TEST_F(NotificationCacherTest, CacheExisting_LoadsSingleFile) {
     EXPECT_TRUE(notification_cache.folders.count("firefox") > 0);
 }
 
-TEST_F(NotificationCacherTest, CacheExisting_IgnoresSettingsFile) {
-    // Create a .settings.json file
-    fs::path settings_path = root_path / "firefox" / ".settings.json";
-    fs::create_directories(settings_path.parent_path());
-    QFile file(QString::fromStdString(settings_path.string()));
-    file.open(QIODevice::WriteOnly);
-    file.write("{}");
-    file.close();
+TEST_F(NotificationCacherTest, CacheExisting_IgnoresGlobalConfigFileOutsideRoot) {
+    fs::path config_path = Settings::getConfigPath();
+    std::error_code ec;
+    fs::remove(config_path, ec);
+
+    ASSERT_TRUE(Settings::writeConfig(QJsonObject{{"version", 1}, {"folders", QJsonObject()}}));
 
     cacher->cacheExistingNotifications(root_path);
 
-    // Settings file should not be treated as notification
-    if (notification_cache.folders.count("firefox") > 0) {
-        EXPECT_TRUE(notification_cache.folders["firefox"].notifications.empty());
-    }
+    EXPECT_TRUE(notification_cache.folders.empty());
+    EXPECT_TRUE(notification_cache.notifications.empty());
 }
 
 TEST_F(NotificationCacherTest, CacheExisting_LoadsMultipleFiles) {
@@ -383,5 +386,24 @@ TEST_F(NotificationCacherTest, Clear_DiskNotification_MovedToTrash) {
 
     cacher->clear(notif_path);
 
+    EXPECT_FALSE(fs::exists(notif_path));
+}
+
+TEST_F(NotificationCacherTest, Clear_FolderWithConfiguredDescendant_NotDeleted) {
+    fs::path notif_path = root_path / "firefox" / "new-tab" / "run-1.json";
+    CachedNotification n = createTestNotification("Firefox", "New Tab", 1, notif_path);
+    cacher->cache(n);
+    ASSERT_TRUE(fs::exists(root_path / "firefox"));
+
+    QJsonObject config = Settings::loadConfig();
+    QJsonObject folders = config["folders"].toObject();
+    folders["firefox/new-tab"] = QJsonObject{{"notification_backoff_minutes", 5}};
+    config["folders"] = folders;
+    ASSERT_TRUE(Settings::writeConfig(config));
+
+    cacher->clear(root_path / "firefox");
+
+    QThread::msleep(100);
+    EXPECT_TRUE(fs::exists(root_path / "firefox"));
     EXPECT_FALSE(fs::exists(notif_path));
 }

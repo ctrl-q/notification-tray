@@ -7,8 +7,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QIcon>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStyleFactory>
@@ -249,7 +247,6 @@ QString SystemTrayFileBrowser::loadQss(const QString& qssFile) {
 void SystemTrayFileBrowser::startTimer() {
     m_timer = new QTimer(this);
     m_timer->setInterval(60000);
-    connect(m_timer, &QTimer::timeout, this, &SystemTrayFileBrowser::refreshSettings);
     connect(m_timer, &QTimer::timeout, m_tray.get(), &Tray::refresh);
     connect(m_timer, &QTimer::timeout, m_notifier.get(), &Notifier::batchNotify);
     m_timer->start();
@@ -260,24 +257,24 @@ void SystemTrayFileBrowser::refreshSettings() {
     m_hide_from_tray.clear();
     m_notification_backoff_minutes.clear();
 
-    for (const auto& entry : fs::recursive_directory_iterator(m_root_path)) {
-        if (entry.path().filename() == ".settings.json") {
-            Settings::cacheDateTimeSetting(entry.path().parent_path(), "do_not_disturb_until",
-                                           m_do_not_disturb);
-            Settings::cacheDateTimeSetting(entry.path().parent_path(), "hide_from_tray_until",
-                                           m_hide_from_tray);
+    QJsonObject folders = Settings::loadConfig().value("folders").toObject();
+    for (auto it = folders.begin(); it != folders.end(); ++it) {
+        fs::path folder_path = Settings::getFolderPathFromKey(m_root_path, it.key().toStdString());
+        QJsonObject section = it.value().toObject();
 
-            QFile file(QString::fromStdString(entry.path().string()));
-            if (file.open(QIODevice::ReadOnly)) {
-                QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-                if (doc.isObject()) {
-                    QJsonObject obj = doc.object();
-                    if (obj.contains("notification_backoff_minutes")) {
-                        m_notification_backoff_minutes[entry.path().parent_path()] =
-                            obj["notification_backoff_minutes"].toInt();
-                    }
-                }
-            }
+        if (section.contains("do_not_disturb_until")) {
+            Settings::cacheDateTimeSetting(m_root_path, folder_path, "do_not_disturb_until",
+                                           m_do_not_disturb);
+        }
+
+        if (section.contains("hide_from_tray_until")) {
+            Settings::cacheDateTimeSetting(m_root_path, folder_path, "hide_from_tray_until",
+                                           m_hide_from_tray);
+        }
+
+        if (section.contains("notification_backoff_minutes")) {
+            m_notification_backoff_minutes[folder_path] =
+                section["notification_backoff_minutes"].toInt();
         }
     }
 }

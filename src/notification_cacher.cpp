@@ -2,6 +2,7 @@
 
 #include "notifier.h"
 #include "utils/logging.h"
+#include "utils/settings.h"
 
 #include <QDir>
 #include <QFile>
@@ -280,13 +281,7 @@ void NotificationCacher::clear(const fs::path& path) {
             markAsTrashed(current->folders[filename]);
         }
     } else {
-        bool has_settings = false;
-        for (const auto& entry : fs::recursive_directory_iterator(path)) {
-            if (entry.path().filename() == ".settings.json") {
-                has_settings = true;
-                break;
-            }
-        }
+        bool has_settings = Settings::hasFolderSettingAtOrBelow(m_root_path, path);
 
         if (!has_settings) {
             send2trash(path);

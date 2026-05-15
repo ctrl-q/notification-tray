@@ -5,10 +5,7 @@
 
 #include <QAction>
 #include <QColor>
-#include <QFile>
 #include <QFont>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QMenu>
 #include <QPainter>
 
@@ -290,30 +287,14 @@ void Tray::notifyFolder(NotificationFolder& folder) {
 }
 
 void Tray::updateNotificationBackoffMinutes(const fs::path& folder_path, int minutes) {
-    m_notification_backoff_minutes[folder_path] = minutes;
-
-    fs::path settings_file = folder_path / ".settings.json";
-    QString settings_path = QString::fromStdString(settings_file.string());
-
-    QJsonObject existing_settings;
-    QFile file(settings_path);
-    if (file.open(QIODevice::ReadOnly)) {
-        existing_settings = QJsonDocument::fromJson(file.readAll()).object();
-        file.close();
-    }
-
-    existing_settings["notification_backoff_minutes"] = minutes;
-
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write(QJsonDocument(existing_settings).toJson());
-        file.close();
-    }
+    Settings::writeIntSetting(m_root_path, folder_path, "notification_backoff_minutes", minutes,
+                              m_notification_backoff_minutes);
 }
 
 void Tray::updateDateTimeSetting(const QString& setting_name, const fs::path& folder_path,
                                  const QDateTime& until, Cache& cache) {
-    Settings::writeDateTimeSetting(folder_path, setting_name, until, cache);
-    Settings::cacheDateTimeSetting(folder_path, setting_name, cache);
+    Settings::writeDateTimeSetting(m_root_path, folder_path, setting_name, until, cache);
+    Settings::cacheDateTimeSetting(m_root_path, folder_path, setting_name, cache);
     updateIcon();
     setupTrayMenu();
 }

@@ -1,6 +1,7 @@
 #include "utils/paths.h"
 
 #include "utils/logging.h"
+#include "utils/settings.h"
 
 #include <QFile>
 #include <QJSEngine>
@@ -139,62 +140,61 @@ fs::path Paths::getCustomOutputDir(const fs::path& root_path, const fs::path& de
     std::vector<fs::path> dirs_to_check;
     fs::path current = default_outdir;
 
-    // Add default_outdir and all its parents up to root_path
-    while (current != root_path && current.string().find(root_path.string()) == 0) {
+    // Add default_outdir and all its parents down to and including root_path
+    while (current.string().find(root_path.string()) == 0) {
         dirs_to_check.push_back(current);
+        if (current == root_path) {
+            break;
+        }
         current = current.parent_path();
     }
 
     // Reverse to check from root to specific
     std::reverse(dirs_to_check.begin(), dirs_to_check.end());
 
-    // Check each directory for .settings.json with subdir_callback
+    QJsonObject folders = Settings::loadConfig().value("folders").toObject();
+
+    // Check each directory for configured subdir_callback
     for (const auto& dir : dirs_to_check) {
-        fs::path settings_file = dir / ".settings.json";
+        std::string key = Settings::getFolderKey(root_path, dir);
+        QJsonObject section = folders.value(QString::fromStdString(key)).toObject();
+        if (!section.contains("subdir_callback")) {
+            continue;
+        }
 
-        if (fs::exists(settings_file)) {
-            QFile file(QString::fromStdString(settings_file.string()));
-            if (file.open(QIODevice::ReadOnly)) {
-                QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-                if (doc.isObject()) {
-                    QJsonObject obj = doc.object();
-                    if (obj.contains("subdir_callback")) {
-                        QString callback = obj["subdir_callback"].toString();
+        QString callback = section["subdir_callback"].toString();
+        logger.debug(QString("Found subdir_callback in global settings for key %1")
+                         .arg(QString::fromStdString(key)));
 
-                        logger.debug(QString("Found subdir_callback in %1")
-                                         .arg(QString::fromStdString(settings_file.string())));
+        auto subdir_result = evaluateSubdirCallback(callback, notification);
+        if (!subdir_result.has_value()) {
+            continue;
+        }
 
-                        auto subdir_result = evaluateSubdirCallback(callback, notification);
+        QStringList subdir_parts = subdir_result.value();
 
-                        if (subdir_result.has_value()) {
-                            QStringList subdir_parts = subdir_result.value();
+        // Build the output path
+        fs::path outdir = dir;
+        for (const QString& part : subdir_parts) {
+            outdir = outdir / slugify(part).toStdString();
+        }
 
-                            // Build the output path
-                            fs::path outdir = dir;
-                            for (const QString& part : subdir_parts) {
-                                outdir = outdir / slugify(part).toStdString();
-                            }
+        // Validate that outdir is below dir
+        fs::path canonical_dir = fs::weakly_canonical(dir);
+        fs::path canonical_outdir = fs::weakly_canonical(outdir);
 
-                            // Validate that outdir is below dir
-                            fs::path canonical_dir = fs::weakly_canonical(dir);
-                            fs::path canonical_outdir = fs::weakly_canonical(outdir);
+        std::string dir_str = canonical_dir.string();
+        std::string outdir_str = canonical_outdir.string();
 
-                            std::string dir_str = canonical_dir.string();
-                            std::string outdir_str = canonical_outdir.string();
-
-                            if (outdir_str.find(dir_str) == 0) {
-                                logger.info(QString("Using custom subdir: %1")
-                                                .arg(QString::fromStdString(outdir.string())));
-                                return outdir;
-                            } else {
-                                logger.error(QString("Subdir must be below %1, got %2")
-                                                 .arg(QString::fromStdString(dir_str))
-                                                 .arg(QString::fromStdString(outdir_str)));
-                            }
-                        }
-                    }
-                }
-            }
+        if (outdir_str.find(dir_str) == 0) {
+            logger.info(
+                QString("Using custom subdir from key %1: %2")
+                    .arg(QString::fromStdString(key), QString::fromStdString(outdir.string())));
+            return outdir;
+        } else {
+            logger.error(QString("Subdir must be below %1, got %2")
+                             .arg(QString::fromStdString(dir_str))
+                             .arg(QString::fromStdString(outdir_str)));
         }
     }
 

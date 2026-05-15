@@ -114,15 +114,45 @@ theme=<your_theme_name>
 
 ### Local options
 
-Local options are specific to each notification and are configurable using a different files.
+Local options are configured in a single global JSON file:
 
-The files can be placed anywhere in between the base notification storage directory and the final directory of a notification. Children settings take precedence over their parent settings
+`~/.config/notification-tray/settings.json`
+
+The path follows Qt's `QStandardPaths::ConfigLocation` and may vary if your environment overrides XDG config paths.
+
+Configuration uses a `folders` map keyed by notification folder path relative to the storage root:
+
+- `"."` for the root
+- `"app"` for an app folder
+- `"app/summary"` for nested folders
+
+Example:
+
+```json
+{
+  "version": 1,
+  "folders": {
+    ".": {
+      "notification_backoff_minutes": 5
+    },
+    "firefox": {
+      "sound": "notify.wav"
+    },
+    "firefox/new-tab": {
+      "do_not_disturb_until": "2026-05-15T22:00:00Z",
+      "hide_from_tray_until": "2026-05-15T23:00:00Z"
+    }
+  }
+}
+```
+
+For `notification_backoff_minutes`, `do_not_disturb_until`, `hide_from_tray_until`, and `sound`, children override parents (closest ancestor wins).
 
 #### Notification grouping
 
 By default, every notification is stored under the notification storage directory, at `slugify(<app_name>)/slugify(<summary>)/<unique run ID>-<id>.json`
 
-To change this, set `subdir_callback` in a .settings.json in any folder in that directory tree
+To change this, set `subdir_callback` in the corresponding folder entry under `folders`.
 
 ```json5
 {
@@ -132,23 +162,38 @@ To change this, set `subdir_callback` in a .settings.json in any folder in that 
 }
 ```
 
-#### Do not Disturb
+#### Do Not Disturb
 
 notification-tray provides a do not disturb submenu under every folder, with 3 preset values: 1 hour, 8 hours and forever
 
-To set a different value, set `do_not_disturb_until` to an iso-formatted future date in .settings.json
+To set a different value, set `do_not_disturb_until` to an ISO-formatted future date in that folder section.
 
 #### Notification batching
 
-If you receive multiple notifications in quick succession, and would like to receive them in one batch instead, set `notification_backoff_minutes` to a integer in .settings.json
+If you receive multiple notifications in quick succession, and would like to receive them in one batch instead, set `notification_backoff_minutes` to an integer in that folder section.
 
 #### Custom notification sounds
 
-Set `sound` to a file path in `.settings.json` to play a custom sound for notifications in that folder. The path can be absolute or relative to the folder containing `.settings.json`. Child folders inherit the setting from parent folders, and a more specific setting takes precedence.
+Set `sound` to a file path to play a custom sound for notifications in that folder section. The path can be absolute or relative to the folder key where the setting is defined. Child folders inherit the setting from parent folders, and a more specific setting takes precedence.
 
 ```json
 { "sound": "notify.wav" }
 ```
+
+#### Migration from legacy `.settings.json`
+
+Use `scripts/migrate_settings.py` to convert existing legacy files under `~/.local/share/dbus-to-json` into the global config:
+
+```bash
+python3 scripts/migrate_settings.py --dry-run
+python3 scripts/migrate_settings.py
+```
+
+Useful options:
+
+- `--input-root <path>` to migrate from a custom storage root
+- `--output <path>` to write to a custom settings file
+- Existing output files are backed up automatically before overwrite
 
 #### Notification timeout
 

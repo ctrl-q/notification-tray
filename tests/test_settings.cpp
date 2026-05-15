@@ -15,17 +15,23 @@ protected:
         temp_dir = std::make_unique<QTemporaryDir>();
         ASSERT_TRUE(temp_dir->isValid());
         root_path = fs::path(temp_dir->path().toStdString());
+
+        Settings::resetConfigCache();
+
+        fs::path config_path = Settings::getConfigPath();
+        std::error_code ec;
+        fs::remove(config_path, ec);
     }
 
     void TearDown() override { temp_dir.reset(); }
 
-    void createSettingsFile(const fs::path& folder, const QJsonObject& settings) {
-        fs::create_directories(folder);
-        fs::path settings_file = folder / ".settings.json";
-        QFile file(QString::fromStdString(settings_file.string()));
-        ASSERT_TRUE(file.open(QIODevice::WriteOnly));
-        file.write(QJsonDocument(settings).toJson());
-        file.close();
+    void setFolderSettings(const fs::path& folder, const QJsonObject& settings) {
+        QJsonObject config = Settings::loadConfig();
+        QJsonObject folders = config["folders"].toObject();
+        QString key = QString::fromStdString(Settings::getFolderKey(root_path, folder));
+        folders[key] = settings;
+        config["folders"] = folders;
+        ASSERT_TRUE(Settings::writeConfig(config));
     }
 
     std::unique_ptr<QTemporaryDir> temp_dir;
@@ -188,7 +194,7 @@ TEST_F(SettingsTest, CacheDateTimeSetting_NoSettingsFile) {
     fs::path folder = root_path / "app";
     fs::create_directories(folder);
 
-    Settings::cacheDateTimeSetting(folder, "do_not_disturb_until", cache);
+    Settings::cacheDateTimeSetting(root_path, folder, "do_not_disturb_until", cache);
     EXPECT_TRUE(cache.empty());
 }
 
@@ -199,9 +205,9 @@ TEST_F(SettingsTest, CacheDateTimeSetting_SettingExists) {
     QDateTime expected = QDateTime::currentDateTimeUtc().addSecs(3600);
     QJsonObject settings;
     settings["do_not_disturb_until"] = expected.toString(Qt::ISODate);
-    createSettingsFile(folder, settings);
+    setFolderSettings(folder, settings);
 
-    Settings::cacheDateTimeSetting(folder, "do_not_disturb_until", cache);
+    Settings::cacheDateTimeSetting(root_path, folder, "do_not_disturb_until", cache);
 
     ASSERT_TRUE(cache.count(folder) > 0);
     ASSERT_TRUE(cache[folder].has_value());
@@ -215,9 +221,9 @@ TEST_F(SettingsTest, CacheDateTimeSetting_EmptyString) {
 
     QJsonObject settings;
     settings["do_not_disturb_until"] = "";
-    createSettingsFile(folder, settings);
+    setFolderSettings(folder, settings);
 
-    Settings::cacheDateTimeSetting(folder, "do_not_disturb_until", cache);
+    Settings::cacheDateTimeSetting(root_path, folder, "do_not_disturb_until", cache);
 
     ASSERT_TRUE(cache.count(folder) > 0);
     EXPECT_FALSE(cache[folder].has_value());
@@ -229,9 +235,9 @@ TEST_F(SettingsTest, CacheDateTimeSetting_SettingMissing) {
 
     QJsonObject settings;
     settings["other_setting"] = "value";
-    createSettingsFile(folder, settings);
+    setFolderSettings(folder, settings);
 
-    Settings::cacheDateTimeSetting(folder, "do_not_disturb_until", cache);
+    Settings::cacheDateTimeSetting(root_path, folder, "do_not_disturb_until", cache);
     EXPECT_TRUE(cache.empty());
 }
 
@@ -243,25 +249,27 @@ TEST_F(SettingsTest, WriteDateTimeSetting_CreatesFile) {
     fs::create_directories(folder);
 
     QDateTime until = QDateTime::currentDateTimeUtc().addSecs(3600);
-    Settings::writeDateTimeSetting(folder, "do_not_disturb_until", until, cache);
+    Settings::writeDateTimeSetting(root_path, folder, "do_not_disturb_until", until, cache);
 
     // Check cache was updated
     ASSERT_TRUE(cache.count(folder) > 0);
     ASSERT_TRUE(cache[folder].has_value());
     EXPECT_EQ(cache[folder].value(), until);
 
-    // Check file was created
-    fs::path settings_file = folder / ".settings.json";
+    // Check config file was created
+    fs::path settings_file = Settings::getConfigPath();
     EXPECT_TRUE(fs::exists(settings_file));
 
-    // Verify file contents
+    // Verify file contents in folder section
     QFile file(QString::fromStdString(settings_file.string()));
     ASSERT_TRUE(file.open(QIODevice::ReadOnly));
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     ASSERT_TRUE(doc.isObject());
-    QJsonObject obj = doc.object();
-    EXPECT_TRUE(obj.contains("do_not_disturb_until"));
-    EXPECT_EQ(obj["do_not_disturb_until"].toString(), until.toString(Qt::ISODate));
+    QJsonObject folders = doc.object()["folders"].toObject();
+    QString key = QString::fromStdString(Settings::getFolderKey(root_path, folder));
+    QJsonObject folder_obj = folders[key].toObject();
+    EXPECT_TRUE(folder_obj.contains("do_not_disturb_until"));
+    EXPECT_EQ(folder_obj["do_not_disturb_until"].toString(), until.toString(Qt::ISODate));
 }
 
 TEST_F(SettingsTest, WriteDateTimeSetting_PreservesExistingSettings) {
@@ -272,17 +280,19 @@ TEST_F(SettingsTest, WriteDateTimeSetting_PreservesExistingSettings) {
     QJsonObject existing;
     existing["other_setting"] = "existing_value";
     existing["notification_backoff_minutes"] = 30;
-    createSettingsFile(folder, existing);
+    setFolderSettings(folder, existing);
 
     QDateTime until = QDateTime::currentDateTimeUtc().addSecs(3600);
-    Settings::writeDateTimeSetting(folder, "do_not_disturb_until", until, cache);
+    Settings::writeDateTimeSetting(root_path, folder, "do_not_disturb_until", until, cache);
 
-    // Verify both old and new settings exist
-    fs::path settings_file = folder / ".settings.json";
+    // Verify both old and new settings exist in folder section
+    fs::path settings_file = Settings::getConfigPath();
     QFile file(QString::fromStdString(settings_file.string()));
     ASSERT_TRUE(file.open(QIODevice::ReadOnly));
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    QJsonObject obj = doc.object();
+    QJsonObject folders = doc.object()["folders"].toObject();
+    QString key = QString::fromStdString(Settings::getFolderKey(root_path, folder));
+    QJsonObject obj = folders[key].toObject();
 
     EXPECT_EQ(obj["other_setting"].toString(), "existing_value");
     EXPECT_EQ(obj["notification_backoff_minutes"].toInt(), 30);
@@ -297,18 +307,20 @@ TEST_F(SettingsTest, WriteDateTimeSetting_OverwritesExistingValue) {
     QDateTime old_time = QDateTime::currentDateTimeUtc().addSecs(-3600);
     QJsonObject existing;
     existing["do_not_disturb_until"] = old_time.toString(Qt::ISODate);
-    createSettingsFile(folder, existing);
+    setFolderSettings(folder, existing);
 
     // Write new value
     QDateTime new_time = QDateTime::currentDateTimeUtc().addSecs(7200);
-    Settings::writeDateTimeSetting(folder, "do_not_disturb_until", new_time, cache);
+    Settings::writeDateTimeSetting(root_path, folder, "do_not_disturb_until", new_time, cache);
 
-    // Verify new value
-    fs::path settings_file = folder / ".settings.json";
+    // Verify new value in folder section
+    fs::path settings_file = Settings::getConfigPath();
     QFile file(QString::fromStdString(settings_file.string()));
     ASSERT_TRUE(file.open(QIODevice::ReadOnly));
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    QJsonObject obj = doc.object();
+    QJsonObject folders = doc.object()["folders"].toObject();
+    QString key = QString::fromStdString(Settings::getFolderKey(root_path, folder));
+    QJsonObject obj = folders[key].toObject();
 
     EXPECT_EQ(obj["do_not_disturb_until"].toString(), new_time.toString(Qt::ISODate));
 }
@@ -328,7 +340,7 @@ TEST_F(SettingsTest, GetSoundFile_AbsolutePath) {
 
     QJsonObject settings;
     settings["sound"] = "/usr/share/sounds/alert.wav";
-    createSettingsFile(folder, settings);
+    setFolderSettings(folder, settings);
 
     std::string result = Settings::getSoundFile(root_path, folder);
     EXPECT_EQ(result, "/usr/share/sounds/alert.wav");
@@ -339,7 +351,7 @@ TEST_F(SettingsTest, GetSoundFile_RelativePathResolvedToSettingsDir) {
 
     QJsonObject settings;
     settings["sound"] = "alert.wav";
-    createSettingsFile(folder, settings);
+    setFolderSettings(folder, settings);
 
     std::string result = Settings::getSoundFile(root_path, folder);
     EXPECT_EQ(result, (folder / "alert.wav").string());
@@ -352,7 +364,7 @@ TEST_F(SettingsTest, GetSoundFile_InheritedFromParent) {
 
     QJsonObject settings;
     settings["sound"] = "/sounds/notify.wav";
-    createSettingsFile(app_folder, settings);
+    setFolderSettings(app_folder, settings);
 
     std::string result = Settings::getSoundFile(root_path, summary_folder);
     EXPECT_EQ(result, "/sounds/notify.wav");
@@ -364,11 +376,11 @@ TEST_F(SettingsTest, GetSoundFile_ChildOverridesParent) {
 
     QJsonObject parent_settings;
     parent_settings["sound"] = "/sounds/parent.wav";
-    createSettingsFile(app_folder, parent_settings);
+    setFolderSettings(app_folder, parent_settings);
 
     QJsonObject child_settings;
     child_settings["sound"] = "/sounds/child.wav";
-    createSettingsFile(summary_folder, child_settings);
+    setFolderSettings(summary_folder, child_settings);
 
     std::string result = Settings::getSoundFile(root_path, summary_folder);
     EXPECT_EQ(result, "/sounds/child.wav");
@@ -379,7 +391,7 @@ TEST_F(SettingsTest, GetSoundFile_EmptyStringReturnsEmpty) {
 
     QJsonObject settings;
     settings["sound"] = "";
-    createSettingsFile(folder, settings);
+    setFolderSettings(folder, settings);
 
     std::string result = Settings::getSoundFile(root_path, folder);
     EXPECT_TRUE(result.empty());
@@ -390,8 +402,48 @@ TEST_F(SettingsTest, GetSoundFile_MissingKeyReturnsEmpty) {
 
     QJsonObject settings;
     settings["other_setting"] = "value";
-    createSettingsFile(folder, settings);
+    setFolderSettings(folder, settings);
 
     std::string result = Settings::getSoundFile(root_path, folder);
     EXPECT_TRUE(result.empty());
+}
+
+TEST_F(SettingsTest, FolderKey_RootIsDot) {
+    EXPECT_EQ(Settings::getFolderKey(root_path, root_path), ".");
+}
+
+TEST_F(SettingsTest, FolderKey_NestedUsesForwardSlashes) {
+    fs::path folder = root_path / "firefox" / "new-tab";
+    EXPECT_EQ(Settings::getFolderKey(root_path, folder), "firefox/new-tab");
+}
+
+TEST_F(SettingsTest, FolderPathFromKey_DotResolvesToRoot) {
+    EXPECT_EQ(Settings::getFolderPathFromKey(root_path, "."), root_path);
+}
+
+TEST_F(SettingsTest, FolderPathFromKey_NestedResolvesUnderRoot) {
+    fs::path expected = root_path / "firefox" / "new-tab";
+    EXPECT_EQ(Settings::getFolderPathFromKey(root_path, "firefox/new-tab"), expected);
+}
+
+TEST_F(SettingsTest, HasFolderSettingAtOrBelow_ReturnsTrueForExactMatch) {
+    fs::path folder = root_path / "firefox";
+    setFolderSettings(folder, QJsonObject{{"sound", "notify.wav"}});
+
+    EXPECT_TRUE(Settings::hasFolderSettingAtOrBelow(root_path, folder));
+}
+
+TEST_F(SettingsTest, HasFolderSettingAtOrBelow_ReturnsTrueForDescendantMatch) {
+    fs::path parent = root_path / "firefox";
+    fs::path child = root_path / "firefox" / "new-tab";
+    setFolderSettings(child, QJsonObject{{"sound", "notify.wav"}});
+
+    EXPECT_TRUE(Settings::hasFolderSettingAtOrBelow(root_path, parent));
+}
+
+TEST_F(SettingsTest, HasFolderSettingAtOrBelow_ReturnsFalseWithoutMatch) {
+    fs::path folder = root_path / "firefox";
+    setFolderSettings(root_path / "discord", QJsonObject{{"sound", "notify.wav"}});
+
+    EXPECT_FALSE(Settings::hasFolderSettingAtOrBelow(root_path, folder));
 }
