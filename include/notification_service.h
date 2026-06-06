@@ -3,6 +3,7 @@
 #include "notification_types.h"
 
 #include <QDBusConnection>
+#include <QDBusContext>
 #include <QObject>
 
 #include <filesystem>
@@ -22,7 +23,7 @@ signals:
     void notificationClosed(int id, int reason);
 };
 
-class NotificationService : public QObject {
+class NotificationService : public QObject, protected QDBusContext {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.freedesktop.Notifications")
 

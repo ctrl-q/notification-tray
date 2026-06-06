@@ -64,8 +64,16 @@ SystemTrayFileBrowser::SystemTrayFileBrowser(int& argc, char** argv, const fs::p
 
     connect(m_notifier.get(), &Notifier::actionInvoked, [this](int id, const QString& key) {
         emit m_notification_service->ActionInvoked(id, key);
-        m_notifier->closeNotification(id, NotificationCloseReason::DISMISSED_BY_USER);
     });
+
+    connect(m_notification_service.get(), &NotificationService::ActionInvoked, this,
+            [this](uint id, const QString&) {
+                if (m_notifier->hasActiveWidget(static_cast<int>(id))) {
+                    m_notifier->closeNotification(static_cast<int>(id),
+                                                  NotificationCloseReason::DISMISSED_BY_USER);
+                }
+            },
+            Qt::QueuedConnection);
 
     m_tray = std::make_unique<Tray>(m_root_path, m_do_not_disturb, m_hide_from_tray,
                                     m_notification_backoff_minutes, m_notifier.get(),

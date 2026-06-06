@@ -4,7 +4,6 @@
 #include "utils/paths.h"
 
 #include <QDBusConnection>
-#include <QDBusContext>
 #include <QDBusMessage>
 
 static Logger logger = Logger::getLogger("NotificationService");
@@ -90,11 +89,10 @@ void NotificationService::CloseNotification(uint id) {
             emit signaler->notificationClosed(id, reason);
         }
     } else {
-        // Python raises dbus.exceptions.DBusException() when ID not found
-        // In Qt, we send an error reply on the D-Bus connection
-        QDBusMessage error = QDBusMessage::createError(
-            QDBusError::InvalidArgs, QString("Notification with id %1 not found").arg(id));
-        QDBusConnection::sessionBus().send(error);
+        if (calledFromDBus()) {
+            sendErrorReply(QDBusError::InvalidArgs,
+                           QString("Notification with id %1 not found").arg(id));
+        }
         logger.error(QString("CloseNotification: ID %1 not found").arg(id));
     }
 }
@@ -112,28 +110,44 @@ void NotificationService::CloseActiveNotifications() {
 void NotificationService::OpenActiveNotifications() {
     logger.info("OpenActiveNotifications called");
 
-    // Collect IDs and actions first, then process (like Python does)
+    // Exclude empty action keys when counting.
+    // Behavior:
+    // - one non-empty action => invoke it
+    // - multiple non-empty actions => error
     std::vector<std::pair<uint, QString>> ids_to_invoke;
 
     for (auto& [id, notification] : notifications) {
         if (!notification.closed_at.has_value()) {
-            size_t action_count = notification.actions.size();
-            if (action_count == 0) {
+            std::vector<QString> non_empty_action_keys;
+            for (const auto& [key, value] : notification.actions) {
+                Q_UNUSED(value);
+                if (key.isEmpty()) {
+                    continue;
+                }
+                non_empty_action_keys.push_back(key);
+            }
+
+            if (non_empty_action_keys.empty()) {
                 // No actions, skip
                 continue;
-            } else if (action_count == 1) {
-                QString action_key = notification.actions.begin()->first;
+            }
+
+            QString action_key;
+            if (non_empty_action_keys.size() == 1) {
+                action_key = non_empty_action_keys[0];
+            }
+
+            if (!action_key.isEmpty()) {
                 ids_to_invoke.push_back({id, action_key});
             } else {
-                // Python raises dbus.exceptions.DBusException for multi-action notifications
-                QDBusMessage error = QDBusMessage::createError(
-                    QDBusError::Failed,
-                    QString("Notification id %1 has more than one action").arg(id));
-                QDBusConnection::sessionBus().send(error);
+                if (calledFromDBus()) {
+                    sendErrorReply(QDBusError::Failed,
+                                   QString("Notification id %1 has more than one action").arg(id));
+                }
                 logger.error(
                     QString("OpenActiveNotifications: Notification %1 has more than one action")
                         .arg(id));
-                return;  // Python raises, so we stop processing
+                return;
             }
         }
     }

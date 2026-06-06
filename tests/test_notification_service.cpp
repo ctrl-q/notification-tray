@@ -196,6 +196,12 @@ TEST_F(NotificationServiceTest, CloseNotification_AlreadyTrashed) {
     EXPECT_EQ(closedSpy.count(), 0);
 }
 
+TEST_F(NotificationServiceTest, CloseNotification_InvalidId_DoesNotCrash) {
+    service = std::make_unique<NotificationService>(root_path, run_id);
+
+    EXPECT_NO_THROW(service->CloseNotification(999));
+}
+
 // Tests for CloseActiveNotifications()
 
 TEST_F(NotificationServiceTest, CloseActiveNotifications_ClosesAll) {
@@ -227,6 +233,48 @@ TEST_F(NotificationServiceTest, CloseActiveNotifications_SkipsAlreadyClosed) {
 
     // First one should still have original close time
     EXPECT_EQ(service->notifications[id1].closed_at.value(), first_close);
+}
+
+TEST_F(NotificationServiceTest, OpenActiveNotifications_MultipleActionsWithDefault_DoesNotEmitActionInvoked) {
+    service = std::make_unique<NotificationService>(root_path, run_id);
+
+    QStringList actions = {"default", "Open", "dismiss", "Dismiss"};
+    service->Notify("App", 0, "", "Summary", "", actions, QVariantMap{}, -1);
+
+    QSignalSpy actionSpy(service.get(), &NotificationService::ActionInvoked);
+
+    service->OpenActiveNotifications();
+
+    EXPECT_EQ(actionSpy.count(), 0);
+}
+
+TEST_F(NotificationServiceTest, OpenActiveNotifications_MultipleActionsNoDefault_DoesNotEmitActionInvoked) {
+    service = std::make_unique<NotificationService>(root_path, run_id);
+
+    QStringList actions = {"open", "Open", "dismiss", "Dismiss"};
+    service->Notify("App", 0, "", "Summary", "", actions, QVariantMap{}, -1);
+
+    QSignalSpy actionSpy(service.get(), &NotificationService::ActionInvoked);
+
+    service->OpenActiveNotifications();
+
+    EXPECT_EQ(actionSpy.count(), 0);
+}
+
+TEST_F(NotificationServiceTest, OpenActiveNotifications_IgnoresEmptyActionKeysWhenCounting) {
+    service = std::make_unique<NotificationService>(root_path, run_id);
+
+    // Two action pairs are provided, but one has an empty key and should be ignored.
+    QStringList actions = {"default", "", "", ""};
+    service->Notify("App", 0, "", "Summary", "", actions, QVariantMap{}, -1);
+
+    QSignalSpy actionSpy(service.get(), &NotificationService::ActionInvoked);
+
+    service->OpenActiveNotifications();
+
+    ASSERT_EQ(actionSpy.count(), 1);
+    EXPECT_EQ(actionSpy.at(0).at(0).toUInt(), 1u);
+    EXPECT_EQ(actionSpy.at(0).at(1).toString(), "default");
 }
 
 // Tests for GetCapabilities()
