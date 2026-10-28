@@ -15,8 +15,8 @@
 
 static Logger logger = Logger::getLogger("Notifier");
 
-Notifier::Notifier(const fs::path& root_path, const Cache& do_not_disturb,
-                   const std::map<fs::path, int>& notification_backoff_minutes,
+Notifier::Notifier(const fs::path& root_path, Cache& do_not_disturb,
+                   std::map<fs::path, int>& notification_backoff_minutes,
                    NotificationFolder& notification_cache, const QString& run_id, QObject* parent)
     : QObject(parent)
     , m_root_path(root_path)

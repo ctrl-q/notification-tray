@@ -16,8 +16,8 @@ class Notifier : public QObject {
     Q_OBJECT
 
 public:
-    explicit Notifier(const fs::path& root_path, const Cache& do_not_disturb,
-                      const std::map<fs::path, int>& notification_backoff_minutes,
+    explicit Notifier(const fs::path& root_path, Cache& do_not_disturb,
+                      std::map<fs::path, int>& notification_backoff_minutes,
                       NotificationFolder& notification_cache, const QString& run_id,
                       QObject* parent = nullptr);
 
@@ -42,8 +42,8 @@ private:
     void snoozeNotification(NotificationWidget* widget, int duration_ms);
 
     fs::path m_root_path;
-    Cache m_do_not_disturb;
-    std::map<fs::path, int> m_notification_backoff_minutes;
+    Cache& m_do_not_disturb;
+    std::map<fs::path, int>& m_notification_backoff_minutes;
     NotificationFolder& m_notification_cache;
     QString m_run_id;
     QDateTime m_started_at;

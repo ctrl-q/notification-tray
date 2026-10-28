@@ -255,6 +255,7 @@ QString SystemTrayFileBrowser::loadQss(const QString& qssFile) {
 void SystemTrayFileBrowser::startTimer() {
     m_timer = new QTimer(this);
     m_timer->setInterval(60000);
+    connect(m_timer, &QTimer::timeout, this, &SystemTrayFileBrowser::refreshSettings);
     connect(m_timer, &QTimer::timeout, m_tray.get(), &Tray::refresh);
     connect(m_timer, &QTimer::timeout, m_notifier.get(), &Notifier::batchNotify);
     m_timer->start();

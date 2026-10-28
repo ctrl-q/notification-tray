@@ -67,8 +67,8 @@ static bool send2trash(const fs::path& path) {
 static Logger logger = Logger::getLogger("NotificationCacher");
 
 NotificationCacher::NotificationCacher(const fs::path& root_path, Notifier* notifier,
-                                       const Cache& do_not_disturb,
-                                       const std::map<fs::path, int>& notification_backoff_minutes,
+                                       Cache& do_not_disturb,
+                                       std::map<fs::path, int>& notification_backoff_minutes,
                                        NotificationFolder& notification_cache,
                                        const QString& run_id, QObject* parent)
     : QObject(parent)

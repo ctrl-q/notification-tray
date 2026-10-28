@@ -16,8 +16,8 @@ class NotificationCacher : public QObject {
 
 public:
     explicit NotificationCacher(const fs::path& root_path, Notifier* notifier,
-                                const Cache& do_not_disturb,
-                                const std::map<fs::path, int>& notification_backoff_minutes,
+                                Cache& do_not_disturb,
+                                std::map<fs::path, int>& notification_backoff_minutes,
                                 NotificationFolder& notification_cache, const QString& run_id,
                                 QObject* parent = nullptr);
 
@@ -37,7 +37,7 @@ private:
 
     fs::path m_root_path;
     Notifier* m_notifier;
-    Cache m_do_not_disturb;
-    std::map<fs::path, int> m_notification_backoff_minutes;
+    Cache& m_do_not_disturb;
+    std::map<fs::path, int>& m_notification_backoff_minutes;
     QString m_run_id;
 };

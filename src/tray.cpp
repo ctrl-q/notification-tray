@@ -11,8 +11,8 @@
 
 static Logger logger = Logger::getLogger("Tray");
 
-Tray::Tray(const fs::path& root_path, const Cache& do_not_disturb, const Cache& hide_from_tray,
-           const std::map<fs::path, int>& notification_backoff_minutes, Notifier* notifier,
+Tray::Tray(const fs::path& root_path, Cache& do_not_disturb, Cache& hide_from_tray,
+           std::map<fs::path, int>& notification_backoff_minutes, Notifier* notifier,
            NotificationCacher* notification_cacher, QApplication* app, QObject* parent)
     : QObject(parent)
     , m_root_path(root_path)

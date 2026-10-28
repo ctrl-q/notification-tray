@@ -17,9 +17,9 @@ class Tray : public QObject {
     Q_OBJECT
 
 public:
-    explicit Tray(const fs::path& root_path, const Cache& do_not_disturb,
-                  const Cache& hide_from_tray,
-                  const std::map<fs::path, int>& notification_backoff_minutes, Notifier* notifier,
+    explicit Tray(const fs::path& root_path, Cache& do_not_disturb,
+                  Cache& hide_from_tray,
+                  std::map<fs::path, int>& notification_backoff_minutes, Notifier* notifier,
                   NotificationCacher* notification_cacher, QApplication* app,
                   QObject* parent = nullptr);
 
@@ -39,9 +39,9 @@ private:
     bool hasNotifications(NotificationFolder& dir);
 
     fs::path m_root_path;
-    Cache m_do_not_disturb;
-    Cache m_hide_from_tray;
-    std::map<fs::path, int> m_notification_backoff_minutes;
+    Cache& m_do_not_disturb;
+    Cache& m_hide_from_tray;
+    std::map<fs::path, int>& m_notification_backoff_minutes;
     QSystemTrayIcon* m_tray_icon = nullptr;
     QMenu* m_tray_menu;
     Notifier* m_notifier;
